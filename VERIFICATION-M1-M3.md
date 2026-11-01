@@ -1,33 +1,45 @@
-# NEXUS-AI M1-M3 verification branch
+# NEXUS-AI M1-M3 source verification
 
-This branch is isolated from `main`. It contains the CI workflow scaffold for M1-M3 verification.
+## Current source of truth
 
-## Required source layout
+- Repository: `axdakkuu08-create/NEXUS-AI-PUBLIC`
+- Working branch: `ci/verify-m1-m3-source`
+- Supplied source: `NEXUS-AI-M1-source-for-verification.zip`
+- Archive contents: 59 project files
+- `package-lock.json`: absent from the supplied archive
+- Android wrapper: absent (no Capacitor config or Android project)
 
-Place the reviewed M1-M3 application source under:
+The workflow has been corrected to extract this exact archive into `frontend/nexus-m1-review/`. It no longer expects a separate, unavailable verified ZIP or a pre-extracted source directory.
 
-`frontend/nexus-m1-review/`
+## Automated workflow
 
-That directory must contain:
-- `package.json`
-- `package-lock.json` committed from a successful install using `https://registry.npmjs.org`
-- Next.js source and configuration
-- A working `npm run lint`, `npm run typecheck`, and `npm run build`
+Open the Actions page and manually run **NEXUS-AI M1-M3 verification** on branch `ci/verify-m1-m3-source`.
 
-## Workflow
+The workflow will:
+1. Extract the supplied source archive.
+2. Generate an initial lockfile using the official npm registry.
+3. Install the resolved dependencies with `npm ci`.
+4. Run ESLint, TypeScript (`npx tsc --noEmit`) and the Next.js production build.
+5. Start the production server and check the root plus all 10 application routes.
+6. Run Playwright Chromium checks at 390x844, 360x800 and 768x1024 on Home, Chat and Workflows, including horizontal-overflow checks.
+7. Upload the generated `package-lock.json` as a workflow artifact for review.
 
-The GitHub Actions workflow runs:
-- `npm ci` using the committed lockfile and official npm registry
-- ESLint
-- TypeScript
-- Next.js production build
-- Production HTTP checks for the root and all 10 application routes
-- Playwright Chromium viewport checks at 390px, 360px and 768px widths
+## Verification status
 
-The Android job is intentionally conditional. The current recovery ZIP does not contain a Capacitor configuration or Android project, so an APK cannot be built until that wrapper is added and tested.
+| Check | Status |
+|---|---|
+| Original source archive extracted locally | PASS |
+| Source inspected; 59 files identified | PASS |
+| Lockfile generated locally | BLOCKED — npm registry request timed out |
+| Local lint / typecheck / production build | NOT RUN — dependencies unavailable |
+| GitHub Actions workflow corrected to extract supplied archive | PASS — committed on verification branch |
+| GitHub Actions execution | PENDING — must be manually dispatched |
+| Mobile viewport checks | PENDING |
+| Android APK | NOT APPLICABLE YET — no Android wrapper in supplied source |
+| Physical Android device test | PENDING |
 
 ## Acceptance policy
 
-M1-M3 are not accepted until the web-verification job passes, the Android wrapper is present and produces an APK, and that APK is installed and tested on a physical Android device. A successful cloud APK build alone does not prove device acceptance.
+Do not mark M1-M3 verified until the GitHub Actions web-verification job passes. The generated lockfile artifact must then be reviewed and committed to the verification branch for repeatable lockfile-based CI. Android APK and physical-device acceptance remain separate follow-up work after an Android wrapper exists.
 
-No deployment or merge to `main` is performed by this branch.
+`main` has not been changed. No deployment or merge is performed by this verification workflow.
