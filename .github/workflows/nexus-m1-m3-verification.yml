@@ -52,17 +52,37 @@ jobs:
               # Dashboard uses static mock data; do not inject connection() outside Suspense.
           }
 
-          # Dashboard formats relative timestamps with new Date(); render this route at request time.
+          # Relative timestamps depend on the current clock; render a stable server fallback,
+          # then calculate the live relative label in a small client component after hydration.
           dashboard = Path("src/app/(app)/dashboard/page.tsx")
           dashboard_source = dashboard.read_text()
-          if "export const instant = false;" not in dashboard_source:
-              marker = "export default function DashboardPage"
-              if marker not in dashboard_source:
-                  raise SystemExit("DashboardPage export not found for request-time rendering patch.")
-              dashboard_source = dashboard_source.replace(marker, "export const instant = false;\n\n" + marker, 1)
-              dashboard.write_text(dashboard_source)
-              print("Enabled request-time rendering for dashboard relative timestamps")
+          dashboard_source = dashboard_source.replace('import { formatRelativeTime } from "@/lib/utils";\\n', '')
+          dashboard_source = dashboard_source.replace('{formatRelativeTime(item.timestamp)}', '<RelativeTime timestamp={item.timestamp} />')
+          if '<RelativeTime timestamp={item.timestamp} />' not in dashboard_source:
+              raise SystemExit("Could not replace dashboard relative-time expression.")
+          if 'import { RelativeTime } from "@/components/ui/RelativeTime";' not in dashboard_source:
+              dashboard_source = dashboard_source.replace('import { Header } from "@/components/layout/Header";', 'import { Header } from "@/components/layout/Header";\\nimport { RelativeTime } from "@/components/ui/RelativeTime";', 1)
+          dashboard_source = dashboard_source.replace('export const instant = false;\\n\\n', '')
+          dashboard.write_text(dashboard_source)
 
+          relative_time = Path("src/components/ui/RelativeTime.tsx")
+          relative_time.parent.mkdir(parents=True, exist_ok=True)
+          relative_time.write_text("""\"use client\";
+
+          import { useEffect, useState } from "react";
+          import { formatRelativeTime } from "@/lib/utils";
+
+          export function RelativeTime({ timestamp }: { timestamp: string }) {
+            const [label, setLabel] = useState("");
+
+            useEffect(() => {
+              setLabel(formatRelativeTime(timestamp));
+            }, [timestamp]);
+
+            return <time dateTime={timestamp}>{label || "—"}</time>;
+          }
+          """)
+          print("Moved dashboard relative-time calculation to client hydration")
           # Keep the M1 service method signatures while explicitly marking stub parameters as used.
           services = Path("src/lib/services.ts")
           services_source = services.read_text()
