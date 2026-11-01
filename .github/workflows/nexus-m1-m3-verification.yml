@@ -32,6 +32,34 @@ jobs:
             echo "::error::The ZIP did not contain package.json at its root."
             exit 1
           }
+      - name: Fix navigation route comparisons
+        working-directory: frontend/nexus-m1-review
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              "src/app/(app)/layout.tsx": [
+                  ('    const active =\n      item.href === "/"\n        ? pathname === "/" || pathname === "/home"\n        : pathname.startsWith(item.href);',
+                   '    const active = pathname.startsWith(item.href);'),
+                  ('href={item.href === "/" ? "/home" : item.href}', 'href={item.href}'),
+              ],
+              "src/components/layout/MobileNavigation.tsx": [
+                  ('    const active =\n      item.href === "/"\n        ? pathname === "/" || pathname === ""\n        : pathname.startsWith(item.href);',
+                   '    const active = pathname.startsWith(item.href);'),
+              ],
+          }
+
+          for filename, edits in replacements.items():
+              path = Path(filename)
+              source = path.read_text()
+              for before, after in edits:
+                  if before not in source:
+                      raise SystemExit(f"Expected navigation code not found in {filename}; refusing an unsafe patch.")
+                  source = source.replace(before, after, 1)
+              path.write_text(source)
+              print(f"Patched {filename}")
+          PY
       - uses: actions/setup-node@v4
         with:
           node-version: 22
