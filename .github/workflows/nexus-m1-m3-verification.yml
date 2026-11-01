@@ -50,7 +50,7 @@ jobs:
                    'const active = pathname.startsWith(item.href);'),
               ],
               "src/app/(app)/dashboard/page.tsx": [
-                  (r'(?m)^import \{ formatRelativeTime \} from "@/lib/utils";
+                  (r'(?m)^import \{ formatRelativeTime \} from "@/lib/utils";$',
                    'import { formatRelativeTime } from "@/lib/utils";\nimport { connection } from "next/server";'),
                   (r'export default function DashboardPage\(\) \{',
                    'export default async function DashboardPage() {\n  await connection();'),
