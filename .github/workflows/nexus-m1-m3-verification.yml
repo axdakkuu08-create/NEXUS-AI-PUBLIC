@@ -59,9 +59,26 @@ jobs:
               marker = "export default function DashboardPage"
               if marker not in dashboard_source:
                   raise SystemExit("DashboardPage export not found for request-time rendering patch.")
-              dashboard_source = dashboard_source.replace(marker, "export const instant = false;\\n\\n" + marker, 1)
+              dashboard_source = dashboard_source.replace(marker, "export const instant = false;\n\n" + marker, 1)
               dashboard.write_text(dashboard_source)
               print("Enabled request-time rendering for dashboard relative timestamps")
+
+          # Keep the M1 service method signatures while explicitly marking stub parameters as used.
+          services = Path("src/lib/services.ts")
+          services_source = services.read_text()
+          parameter_uses = {
+              "async create(_input: { name: string; description?: string }): Promise<Project> {": "async create(_input: { name: string; description?: string }): Promise<Project> {\n    void _input;",
+              "async list(_projectId?: string): Promise<Conversation[]> {": "async list(_projectId?: string): Promise<Conversation[]> {\n    void _projectId;",
+              "async getMessages(_conversationId: string): Promise<Message[]> {": "async getMessages(_conversationId: string): Promise<Message[]> {\n    void _conversationId;",
+              "  ): Promise<Message> {": "  ): Promise<Message> {\n    void _conversationId;\n    void _content;",
+              "async update(_prefs: Partial<UserPreferences>): Promise<UserPreferences> {": "async update(_prefs: Partial<UserPreferences>): Promise<UserPreferences> {\n    void _prefs;",
+          }
+          for old, new in parameter_uses.items():
+              if old not in services_source:
+                  raise SystemExit(f"Expected service stub signature not found: {old}")
+              services_source = services_source.replace(old, new, 1)
+          services.write_text(services_source)
+          print("Marked unused M1 service stub parameters as intentionally consumed")
 
           for filename, replacements in edits.items():
               path = Path(filename)
