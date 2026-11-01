@@ -17,13 +17,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify source directory exists
+      - name: Prepare frontend source
         run: |
-          if [ ! -d frontend/nexus-m1-review ]; then
-            echo "::error::Source directory frontend/nexus-m1-review is missing. Extract the supplied NEXUS-AI frontend ZIP into this exact path on branch ci/verify-m1-m3."
-            echo "The workflow cannot run npm checks until the source files are committed to this branch."
-            exit 1
+          if [ ! -f frontend/nexus-m1-review/package.json ]; then
+            if [ -f NEXUS-AI-frontend-M1.zip ]; then
+              mkdir -p frontend/nexus-m1-review
+              unzip -q NEXUS-AI-frontend-M1.zip -d frontend/nexus-m1-review
+            else
+              echo "::error::Frontend source is missing. Upload NEXUS-AI-frontend-M1.zip to the repository root on branch ci/verify-m1-m3."
+              exit 1
+            fi
           fi
+          test -f frontend/nexus-m1-review/package.json || {
+            echo "::error::The ZIP did not contain package.json at its root."
+            exit 1
+          }
       - uses: actions/setup-node@v4
         with:
           node-version: 22
