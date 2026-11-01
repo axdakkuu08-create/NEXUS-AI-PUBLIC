@@ -65,6 +65,18 @@ jobs:
           dashboard_source = dashboard_source.replace('export const instant = false;\n\n', '')
           dashboard.write_text(dashboard_source)
 
+          # Workflows also formats timestamps during prerender; use the same
+          # hydration-safe client component as the dashboard.
+          workflows = Path("src/app/(app)/workflows/page.tsx")
+          workflows_source = workflows.read_text()
+          workflows_source = workflows_source.replace('import { formatRelativeTime } from "@/lib/utils";\\n', '')
+          workflows_source = workflows_source.replace('{formatRelativeTime(w.lastRun)}', '<RelativeTime timestamp={w.lastRun} />')
+          if '<RelativeTime timestamp={w.lastRun} />' not in workflows_source:
+              raise SystemExit("Could not replace workflows relative-time expression.")
+          if 'import { RelativeTime } from "@/components/ui/RelativeTime";' not in workflows_source:
+              workflows_source = workflows_source.replace('import { Header } from "@/components/layout/Header";', 'import { Header } from "@/components/layout/Header";\\nimport { RelativeTime } from "@/components/ui/RelativeTime";', 1)
+          workflows.write_text(workflows_source)
+
           relative_time = Path("src/components/ui/RelativeTime.tsx")
           relative_time.parent.mkdir(parents=True, exist_ok=True)
           relative_time.write_text(""""use client";
