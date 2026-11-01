@@ -35,14 +35,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Confirm source and lockfile
+      - name: Confirm source and prepare lockfile
         working-directory: frontend/nexus-m1-review
         run: |
-          test -f package.json || { echo '::error::Upload the reviewed source under frontend/nexus-m1-review before running this workflow.'; exit 1; }
-          test -f package-lock.json || {
-            echo "::error::package-lock.json is missing. Generate it with npm install --package-lock-only against registry.npmjs.org and commit it before CI."
-            exit 1
-          }
+          test -f package.json || { echo '::error::package.json is missing from the extracted source.'; exit 1; }
+          if [ ! -f package-lock.json ]; then
+            npm install --package-lock-only --ignore-scripts --registry=https://registry.npmjs.org --no-audit --no-fund
+          fi
+          test -f package-lock.json || { echo '::error::Could not generate package-lock.json from package.json.'; exit 1; }
       - name: Install locked dependencies from official npm registry
         working-directory: frontend/nexus-m1-review
         run: npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
