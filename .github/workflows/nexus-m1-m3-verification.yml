@@ -49,12 +49,7 @@ jobs:
                   (r'const active\s*=\s*item\.href === "/"\s*\?\s*pathname === "/" \|\| pathname === ""\s*:\s*pathname\.startsWith\(item\.href\);',
                    'const active = pathname.startsWith(item.href);'),
               ],
-              "src/app/(app)/dashboard/page.tsx": [
-                  (r'(?m)^import \{ formatRelativeTime \} from "@/lib/utils";$',
-                   'import { formatRelativeTime } from "@/lib/utils";\nimport { connection } from "next/server";'),
-                  (r'export default function DashboardPage\(\) \{',
-                   'export default async function DashboardPage() {\n  await connection();'),
-              ],
+              # Dashboard uses static mock data; do not inject connection() outside Suspense.
           }
 
           for filename, replacements in edits.items():
