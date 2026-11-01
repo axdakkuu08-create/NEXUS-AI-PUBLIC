@@ -2,6 +2,8 @@ name: NEXUS-AI M1-M3 verification
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ci/verify-m1-m3]
 
 permissions:
   contents: read
