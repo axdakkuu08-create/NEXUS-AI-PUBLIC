@@ -67,7 +67,7 @@ jobs:
 
           relative_time = Path("src/components/ui/RelativeTime.tsx")
           relative_time.parent.mkdir(parents=True, exist_ok=True)
-          relative_time.write_text("""\\\"use client\\\";
+          relative_time.write_text(""""use client";
 
           import { useSyncExternalStore } from "react";
           import { formatRelativeTime } from "@/lib/utils";
