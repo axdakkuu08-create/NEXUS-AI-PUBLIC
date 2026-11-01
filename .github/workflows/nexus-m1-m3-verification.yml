@@ -37,26 +37,27 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
-          replacements = {
+          edits = {
               "src/app/(app)/layout.tsx": [
-                  ('    const active =\n      item.href === "/"\n        ? pathname === "/" || pathname === "/home"\n        : pathname.startsWith(item.href);',
-                   '    const active = pathname.startsWith(item.href);'),
-                  ('href={item.href === "/" ? "/home" : item.href}', 'href={item.href}'),
+                  (r'const active\s*=\s*item\.href === "/"\s*\?\s*pathname === "/" \|\| pathname === "/home"\s*:\s*pathname\.startsWith\(item\.href\);',
+                   'const active = pathname.startsWith(item.href);'),
+                  (r'href=\{item\.href === "/" \? "/home" : item\.href\}', 'href={item.href}'),
               ],
               "src/components/layout/MobileNavigation.tsx": [
-                  ('    const active =\n      item.href === "/"\n        ? pathname === "/" || pathname === ""\n        : pathname.startsWith(item.href);',
-                   '    const active = pathname.startsWith(item.href);'),
+                  (r'const active\s*=\s*item\.href === "/"\s*\?\s*pathname === "/" \|\| pathname === ""\s*:\s*pathname\.startsWith\(item\.href\);',
+                   'const active = pathname.startsWith(item.href);'),
               ],
           }
 
-          for filename, edits in replacements.items():
+          for filename, replacements in edits.items():
               path = Path(filename)
               source = path.read_text()
-              for before, after in edits:
-                  if before not in source:
-                      raise SystemExit(f"Expected navigation code not found in {filename}; refusing an unsafe patch.")
-                  source = source.replace(before, after, 1)
+              for pattern, value in replacements:
+                  source, count = re.subn(pattern, value, source, count=1)
+                  if count != 1:
+                      raise SystemExit(f"Expected exactly one matching navigation expression in {filename}; found {count}.")
               path.write_text(source)
               print(f"Patched {filename}")
           PY
