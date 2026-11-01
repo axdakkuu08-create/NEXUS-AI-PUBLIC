@@ -32,7 +32,7 @@ jobs:
             echo "::error::The ZIP did not contain package.json at its root."
             exit 1
           }
-      - name: Fix navigation route comparisons
+      - name: Fix navigation and dashboard prerender issues
         working-directory: frontend/nexus-m1-review
         run: |
           python3 - <<'PY'
@@ -48,6 +48,12 @@ jobs:
               "src/components/layout/MobileNavigation.tsx": [
                   (r'const active\s*=\s*item\.href === "/"\s*\?\s*pathname === "/" \|\| pathname === ""\s*:\s*pathname\.startsWith\(item\.href\);',
                    'const active = pathname.startsWith(item.href);'),
+              ],
+              "src/app/(app)/dashboard/page.tsx": [
+                  (r'^import \\{ formatRelativeTime \\} from "@/lib/utils";$',
+                   'import { formatRelativeTime } from "@/lib/utils";\\nimport { connection } from "next/server";'),
+                  (r'export default function DashboardPage\\(\\) \\{',
+                   'export default async function DashboardPage() {\\n  await connection();'),
               ],
           }
 
