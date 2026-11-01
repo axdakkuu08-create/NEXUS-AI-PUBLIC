@@ -15,15 +15,20 @@ concurrency:
 jobs:
   web-verification:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend/nexus-m1-review
     steps:
       - uses: actions/checkout@v4
+      - name: Verify source directory exists
+        run: |
+          if [ ! -d frontend/nexus-m1-review ]; then
+            echo "::error::Source directory frontend/nexus-m1-review is missing. Extract the supplied NEXUS-AI frontend ZIP into this exact path on branch ci/verify-m1-m3."
+            echo "The workflow cannot run npm checks until the source files are committed to this branch."
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Confirm source and lockfile
+        working-directory: frontend/nexus-m1-review
         run: |
           test -f package.json || { echo '::error::Upload the reviewed source under frontend/nexus-m1-review before running this workflow.'; exit 1; }
           test -f package-lock.json || {
@@ -31,14 +36,19 @@ jobs:
             exit 1
           }
       - name: Install locked dependencies from official npm registry
+        working-directory: frontend/nexus-m1-review
         run: npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
       - name: ESLint
+        working-directory: frontend/nexus-m1-review
         run: npm run lint
       - name: TypeScript
+        working-directory: frontend/nexus-m1-review
         run: npm run typecheck
       - name: Next.js production build
+        working-directory: frontend/nexus-m1-review
         run: npm run build
       - name: Start production server
+        working-directory: frontend/nexus-m1-review
         run: |
           (npm run start -- --hostname 127.0.0.1 > /tmp/nexus-next.log 2>&1 & echo $! > /tmp/nexus-next.pid)
           for i in $(seq 1 60); do
@@ -48,6 +58,7 @@ jobs:
           cat /tmp/nexus-next.log
           exit 1
       - name: Verify all application routes
+        working-directory: frontend/nexus-m1-review
         run: |
           set -e
           for route in /home /dashboard /chat /projects /tasks /agents /workflows /tools /activity /settings; do
@@ -60,10 +71,12 @@ jobs:
           root_code=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/)
           test "$root_code" = "200" -o "$root_code" = "307" -o "$root_code" = "308"
       - name: Install Playwright for viewport checks
+        working-directory: frontend/nexus-m1-review
         run: |
           npm install --no-save --package-lock=false playwright --registry=https://registry.npmjs.org --no-audit --no-fund
           npx playwright install --with-deps chromium
       - name: Mobile viewport smoke tests
+        working-directory: frontend/nexus-m1-review
         run: |
           node <<'NODE'
           const { chromium } = require('playwright');
