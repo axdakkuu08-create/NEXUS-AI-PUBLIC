@@ -51,7 +51,7 @@ jobs:
         run: npm run lint
       - name: TypeScript
         working-directory: frontend/nexus-m1-review
-        run: npm run typecheck
+        run: npx tsc --noEmit
       - name: Next.js production build
         working-directory: frontend/nexus-m1-review
         run: npm run build
