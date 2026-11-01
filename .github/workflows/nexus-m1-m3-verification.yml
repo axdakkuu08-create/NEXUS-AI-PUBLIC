@@ -67,19 +67,21 @@ jobs:
 
           relative_time = Path("src/components/ui/RelativeTime.tsx")
           relative_time.parent.mkdir(parents=True, exist_ok=True)
-          relative_time.write_text("""\"use client\";
+          relative_time.write_text("""\\\"use client\\\";
 
-          import { useEffect, useState } from "react";
+          import { useSyncExternalStore } from "react";
           import { formatRelativeTime } from "@/lib/utils";
 
+          const subscribe = () => () => {};
+
           export function RelativeTime({ timestamp }: { timestamp: string }) {
-            const [label, setLabel] = useState("");
+            const label = useSyncExternalStore(
+              subscribe,
+              () => formatRelativeTime(timestamp),
+              () => "—",
+            );
 
-            useEffect(() => {
-              setLabel(formatRelativeTime(timestamp));
-            }, [timestamp]);
-
-            return <time dateTime={timestamp}>{label || "—"}</time>;
+            return <time dateTime={timestamp}>{label}</time>;
           }
           """)
           print("Moved dashboard relative-time calculation to client hydration")
