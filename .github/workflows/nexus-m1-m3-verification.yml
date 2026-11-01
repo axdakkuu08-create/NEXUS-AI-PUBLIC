@@ -56,13 +56,13 @@ jobs:
           # then calculate the live relative label in a small client component after hydration.
           dashboard = Path("src/app/(app)/dashboard/page.tsx")
           dashboard_source = dashboard.read_text()
-          dashboard_source = dashboard_source.replace('import { formatRelativeTime } from "@/lib/utils";\\n', '')
+          dashboard_source = dashboard_source.replace('import { formatRelativeTime } from "@/lib/utils";\n', '')
           dashboard_source = dashboard_source.replace('{formatRelativeTime(item.timestamp)}', '<RelativeTime timestamp={item.timestamp} />')
           if '<RelativeTime timestamp={item.timestamp} />' not in dashboard_source:
               raise SystemExit("Could not replace dashboard relative-time expression.")
           if 'import { RelativeTime } from "@/components/ui/RelativeTime";' not in dashboard_source:
-              dashboard_source = dashboard_source.replace('import { Header } from "@/components/layout/Header";', 'import { Header } from "@/components/layout/Header";\\nimport { RelativeTime } from "@/components/ui/RelativeTime";', 1)
-          dashboard_source = dashboard_source.replace('export const instant = false;\\n\\n', '')
+              dashboard_source = dashboard_source.replace('import { Header } from "@/components/layout/Header";', 'import { Header } from "@/components/layout/Header";\nimport { RelativeTime } from "@/components/ui/RelativeTime";', 1)
+          dashboard_source = dashboard_source.replace('export const instant = false;\n\n', '')
           dashboard.write_text(dashboard_source)
 
           relative_time = Path("src/components/ui/RelativeTime.tsx")
