@@ -2,10 +2,6 @@ name: NEXUS-AI M1-M3 verification
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ci/verify-m1-m3]
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: read
@@ -25,11 +21,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/nexus-m1-review/package-lock.json
       - name: Confirm source and lockfile
         run: |
-          test -f package.json
+          test -f package.json || { echo '::error::Upload the reviewed source under frontend/nexus-m1-review before running this workflow.'; exit 1; }
           test -f package-lock.json || {
             echo "::error::package-lock.json is missing. Generate it with npm install --package-lock-only against registry.npmjs.org and commit it before CI."
             exit 1
