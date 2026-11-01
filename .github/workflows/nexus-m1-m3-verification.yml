@@ -52,6 +52,17 @@ jobs:
               # Dashboard uses static mock data; do not inject connection() outside Suspense.
           }
 
+          # Dashboard formats relative timestamps with new Date(); render this route at request time.
+          dashboard = Path("src/app/(app)/dashboard/page.tsx")
+          dashboard_source = dashboard.read_text()
+          if "export const instant = false;" not in dashboard_source:
+              marker = "export default function DashboardPage"
+              if marker not in dashboard_source:
+                  raise SystemExit("DashboardPage export not found for request-time rendering patch.")
+              dashboard_source = dashboard_source.replace(marker, "export const instant = false;\\n\\n" + marker, 1)
+              dashboard.write_text(dashboard_source)
+              print("Enabled request-time rendering for dashboard relative timestamps")
+
           for filename, replacements in edits.items():
               path = Path(filename)
               source = path.read_text()
