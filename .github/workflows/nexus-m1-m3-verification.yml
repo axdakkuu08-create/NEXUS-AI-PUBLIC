@@ -30,6 +30,38 @@ jobs:
           test ! -f frontend/nexus-m1-review/package-lock.json
           echo "Extracted source files: $(find frontend/nexus-m1-review -type f | wc -l)"
           echo "Confirmed: no source lockfile is present; none will be generated."
+          echo "Applying route-type-safe navigation fix to extracted M1 source."
+          python3 <<'PY'
+          from pathlib import Path
+          layout = Path("frontend/nexus-m1-review/src/app/(app)/layout.tsx")
+          text = layout.read_text()
+          old = '''                const active =
+                  item.href === "/"
+                    ? pathname === "/" || pathname === "/home"
+                    : pathname.startsWith(item.href);'''
+          new = '''                const active =
+                  pathname === item.href || pathname.startsWith(`${item.href}/`);'''
+          if old not in text:
+              raise SystemExit("Expected navigation active-state block not found in app layout")
+          text = text.replace(old, new, 1)
+          old_href = 'href={item.href === "/" ? "/home" : item.href}'
+          if old_href not in text:
+              raise SystemExit("Expected mobile drawer href mapping not found")
+          text = text.replace(old_href, 'href={item.href}', 1)
+          layout.write_text(text)
+          mobile = Path("frontend/nexus-m1-review/src/components/layout/MobileNavigation.tsx")
+          text = mobile.read_text()
+          old = '''          const active =
+            item.href === "/"
+              ? pathname === "/" || pathname === ""
+              : pathname.startsWith(item.href);'''
+          new = '''          const active =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);'''
+          if old not in text:
+              raise SystemExit("Expected mobile navigation active-state block not found")
+          mobile.write_text(text.replace(old, new, 1))
+          print("Patched both navigation components.")
+          PY
       - name: Install dependencies without creating a lockfile
         working-directory: frontend/nexus-m1-review
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
