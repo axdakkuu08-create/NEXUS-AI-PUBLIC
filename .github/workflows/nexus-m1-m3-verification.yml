@@ -59,13 +59,17 @@ jobs:
           print("Patched route comparisons in both navigation components.")
           dashboard = root / "src/app/(app)/dashboard/page.tsx"
           text = dashboard.read_text()
-          if 'export const dynamic = "force-dynamic";' not in text:
-              target = 'export const metadata = { title: "Dashboard" };'
-              if target not in text:
-                  raise SystemExit("Could not find dashboard metadata declaration")
-              text = text.replace(target, 'export const dynamic = "force-dynamic";\n\n' + target, 1)
-              dashboard.write_text(text)
-          print("Marked dashboard as request-rendered for relative-time calculations.")
+          if 'import { connection } from "next/server";' not in text:
+              text = 'import { connection } from "next/server";\n' + text
+          old_signature = "export default function DashboardPage() {"
+          if old_signature in text:
+              text = text.replace(old_signature, "export default async function DashboardPage() {\\n  await connection();", 1)
+          elif "export default async function DashboardPage()" not in text:
+              raise SystemExit("Could not find dashboard page function signature")
+          if "await connection();" not in text:
+              raise SystemExit("Dashboard request-time connection was not inserted")
+          dashboard.write_text(text)
+          print("Added Next.js connection() before dashboard relative-time rendering.")
           PY
       - name: Install dependencies without creating a lockfile
         working-directory: frontend/nexus-m1-review
