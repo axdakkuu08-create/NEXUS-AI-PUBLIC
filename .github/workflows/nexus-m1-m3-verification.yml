@@ -60,8 +60,7 @@ jobs:
           dashboard = root / "src/app/(app)/dashboard/page.tsx"
           text = dashboard.read_text()
           if 'export const dynamic = "force-dynamic";' not in text:
-              target = 'export const metadata = { title: "Dashboard" };'.
-              target = target[:-1]
+              target = 'export const metadata = { title: "Dashboard" };'
               if target not in text:
                   raise SystemExit("Could not find dashboard metadata declaration")
               text = text.replace(target, 'export const dynamic = "force-dynamic";\n\n' + target, 1)
