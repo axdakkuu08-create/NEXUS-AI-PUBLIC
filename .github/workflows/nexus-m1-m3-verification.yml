@@ -59,17 +59,14 @@ jobs:
           print("Patched route comparisons in both navigation components.")
           dashboard = root / "src/app/(app)/dashboard/page.tsx"
           text = dashboard.read_text()
-          if 'import { connection } from "next/server";' not in text:
-              text = 'import { connection } from "next/server";\n' + text
-          old_signature = "export default function DashboardPage() {"
-          if old_signature in text:
-              text = text.replace(old_signature, "export default async function DashboardPage() {\n  await connection();", 1)
-          elif "export default async function DashboardPage()" not in text:
-              raise SystemExit("Could not find dashboard page function signature")
-          if "await connection();" not in text:
-              raise SystemExit("Dashboard request-time connection was not inserted")
+          text = text.replace('import { connection } from "next/server";\\n', "")
+          text = text.replace('export default async function DashboardPage() {\\n  await connection();', "export default function DashboardPage() {")
+          if "export const instant = false;" not in text:
+              text = "export const instant = false;\\n" + text
+          if "await connection();" in text or 'import { connection } from "next/server";' in text:
+              raise SystemExit("Unexpected connection() patch remains in dashboard")
           dashboard.write_text(text)
-          print("Added Next.js connection() before dashboard relative-time rendering.")
+          print("Configured dashboard as a blocking route for runtime relative-time rendering.")
           PY
       - name: Install dependencies without creating a lockfile
         working-directory: frontend/nexus-m1-review
