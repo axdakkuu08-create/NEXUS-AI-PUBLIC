@@ -57,6 +57,16 @@ jobs:
               raise SystemExit(f"Expected one mobile active-route block, found {n}")
           mobile.write_text(text)
           print("Patched route comparisons in both navigation components.")
+          dashboard = root / "src/app/(app)/dashboard/page.tsx"
+          text = dashboard.read_text()
+          if 'export const dynamic = "force-dynamic";' not in text:
+              target = 'export const metadata = { title: "Dashboard" };'.
+              target = target[:-1]
+              if target not in text:
+                  raise SystemExit("Could not find dashboard metadata declaration")
+              text = text.replace(target, 'export const dynamic = "force-dynamic";\n\n' + target, 1)
+              dashboard.write_text(text)
+          print("Marked dashboard as request-rendered for relative-time calculations.")
           PY
       - name: Install dependencies without creating a lockfile
         working-directory: frontend/nexus-m1-review
