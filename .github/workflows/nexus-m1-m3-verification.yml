@@ -63,7 +63,7 @@ jobs:
               text = 'import { connection } from "next/server";\n' + text
           old_signature = "export default function DashboardPage() {"
           if old_signature in text:
-              text = text.replace(old_signature, "export default async function DashboardPage() {\\n  await connection();", 1)
+              text = text.replace(old_signature, "export default async function DashboardPage() {\n  await connection();", 1)
           elif "export default async function DashboardPage()" not in text:
               raise SystemExit("Could not find dashboard page function signature")
           if "await connection();" not in text:
