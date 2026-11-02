@@ -1,6 +1,9 @@
 name: NEXUS-AI M1-M3 verification
 
 on:
+  push:
+    branches:
+      - ci/verify-m1-m3-source
   workflow_dispatch:
 
 permissions:
@@ -24,13 +27,15 @@ jobs:
           unzip -q NEXUS-AI-M1-source-for-verification.zip -d frontend/nexus-m1-review
           test -f frontend/nexus-m1-review/package.json
           test -f frontend/nexus-m1-review/tsconfig.json
+          test ! -f frontend/nexus-m1-review/package-lock.json
           echo "Extracted source files: $(find frontend/nexus-m1-review -type f | wc -l)"
-      - name: Generate initial lockfile from official npm registry
+          echo "Confirmed: no source lockfile is present; none will be generated."
+      - name: Install dependencies without creating a lockfile
         working-directory: frontend/nexus-m1-review
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
-      - name: Install locked dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
+      - name: Confirm no lockfile was generated
         working-directory: frontend/nexus-m1-review
-        run: npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
+        run: test ! -f package-lock.json
       - name: ESLint
         working-directory: frontend/nexus-m1-review
         run: npm run lint
@@ -63,7 +68,7 @@ jobs:
       - name: Install Playwright browser
         working-directory: frontend/nexus-m1-review
         run: |
-          npm install --no-save --package-lock=false playwright --registry=https://registry.npmjs.org --no-audit --no-fund
+          npm install --no-save --package-lock=false --ignore-scripts playwright --registry=https://registry.npmjs.org --no-audit --no-fund
           npx playwright install --with-deps chromium
       - name: Mobile viewport smoke tests
         working-directory: frontend/nexus-m1-review
@@ -88,13 +93,6 @@ jobs:
             }
           })().catch(error => { console.error(error); process.exit(1); });
           NODE
-      - name: Preserve generated lockfile for review
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-m1-generated-lockfile
-          path: frontend/nexus-m1-review/package-lock.json
-          if-no-files-found: warn
 
   android-apk:
     runs-on: ubuntu-latest
