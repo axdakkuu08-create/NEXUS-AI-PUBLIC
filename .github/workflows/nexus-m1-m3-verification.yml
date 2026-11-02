@@ -33,34 +33,30 @@ jobs:
           echo "Applying route-type-safe navigation fix to extracted M1 source."
           python3 <<'PY'
           from pathlib import Path
-          layout = Path("frontend/nexus-m1-review/src/app/(app)/layout.tsx")
+          import re
+          root = Path("frontend/nexus-m1-review")
+          layout = root / "src/app/(app)/layout.tsx"
           text = layout.read_text()
-          old = '''                const active =
-                  item.href === "/"
-                    ? pathname === "/" || pathname === "/home"
-                    : pathname.startsWith(item.href);'''
-          new = '''                const active =
-                  pathname === item.href || pathname.startsWith(`${item.href}/`);'''
-          if old not in text:
-              raise SystemExit("Expected navigation active-state block not found in app layout")
-          text = text.replace(old, new, 1)
-          old_href = 'href={item.href === "/" ? "/home" : item.href}'
-          if old_href not in text:
-              raise SystemExit("Expected mobile drawer href mapping not found")
-          text = text.replace(old_href, 'href={item.href}', 1)
+          text, n = re.subn(
+              r'const active =\s*item\.href === "/"\s*\? pathname === "/" \|\| pathname === "/home"\s*: pathname\.startsWith\(item\.href\);',
+              'const active = pathname === item.href || pathname.startsWith(`${item.href}/`);',
+              text, count=1)
+          if n != 1:
+              raise SystemExit(f"Expected one app-layout active-route block, found {n}")
+          text, n = re.subn(r'href=\{item\.href === "/" \? "/home" : item\.href\}', 'href={item.href}', text, count=1)
+          if n != 1:
+              raise SystemExit(f"Expected one drawer href mapping, found {n}")
           layout.write_text(text)
-          mobile = Path("frontend/nexus-m1-review/src/components/layout/MobileNavigation.tsx")
+          mobile = root / "src/components/layout/MobileNavigation.tsx"
           text = mobile.read_text()
-          old = '''          const active =
-            item.href === "/"
-              ? pathname === "/" || pathname === ""
-              : pathname.startsWith(item.href);'''
-          new = '''          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);'''
-          if old not in text:
-              raise SystemExit("Expected mobile navigation active-state block not found")
-          mobile.write_text(text.replace(old, new, 1))
-          print("Patched both navigation components.")
+          text, n = re.subn(
+              r'const active =\s*item\.href === "/"\s*\? pathname === "/" \|\| pathname === ""\s*: pathname\.startsWith\(item\.href\);',
+              'const active = pathname === item.href || pathname.startsWith(`${item.href}/`);',
+              text, count=1)
+          if n != 1:
+              raise SystemExit(f"Expected one mobile active-route block, found {n}")
+          mobile.write_text(text)
+          print("Patched route comparisons in both navigation components.")
           PY
       - name: Install dependencies without creating a lockfile
         working-directory: frontend/nexus-m1-review
