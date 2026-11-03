@@ -73,7 +73,7 @@ jobs:
           text = text.replace('{formatRelativeTime(item.timestamp)}', '<RelativeTime timestamp={item.timestamp} />')
           dashboard.write_text(text)
           relative_time = root / "src/components/ui/RelativeTime.tsx"
-          relative_time.write_text(""" "use client";
+          relative_time.write_text(""""use client";
 
 import { useEffect, useState } from "react";
 
@@ -93,6 +93,9 @@ export function RelativeTime({ timestamp }: { timestamp: string }) {
   return <>{label}</>;
 }
 """)
+          generated = relative_time.read_text()
+          if not generated.startswith('"use client";'):
+              raise SystemExit("RelativeTime.tsx is missing its client directive")
           if "formatRelativeTime(item.timestamp)" in dashboard.read_text():
               raise SystemExit("Relative-time client patch did not replace dashboard call")
           print("Moved relative-time formatting to a client component for deterministic prerendering.")
