@@ -96,7 +96,7 @@ jobs:
               "  const label = useSyncExternalStore(",
               "    subscribeToNoChanges,",
               "    () => getRelativeTime(timestamp),",
-              '    () => "—",');
+              '    () => "—",',
               "  );",
               "  return <>{label}</>;",
               "}",
