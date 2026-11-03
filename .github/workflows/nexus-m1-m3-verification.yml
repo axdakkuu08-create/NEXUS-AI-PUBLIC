@@ -59,10 +59,10 @@ jobs:
           print("Patched route comparisons in both navigation components.")
           dashboard = root / "src/app/(app)/dashboard/page.tsx"
           text = dashboard.read_text()
-          text = text.replace('import { connection } from "next/server";\\n', "")
-          text = text.replace('export default async function DashboardPage() {\\n  await connection();', "export default function DashboardPage() {")
+          text = text.replace('import { connection } from "next/server";\n', "")
+          text = text.replace('export default async function DashboardPage() {\n  await connection();', "export default function DashboardPage() {")
           if "export const instant = false;" not in text:
-              text = "export const instant = false;\\n" + text
+              text = "export const instant = false;\n" + text
           if "await connection();" in text or 'import { connection } from "next/server";' in text:
               raise SystemExit("Unexpected connection() patch remains in dashboard")
           dashboard.write_text(text)
