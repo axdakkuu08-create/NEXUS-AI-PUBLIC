@@ -68,12 +68,12 @@ jobs:
           dashboard.write_text(text)
           # Move wall-clock relative-time formatting to the browser to keep prerender deterministic.
           text = dashboard.read_text()
-          text = text.replace('import { formatRelativeTime } from "@/lib/utils";\\n', "")
-          text = text.replace('import Link from "next/link";', 'import Link from "next/link";\\nimport { RelativeTime } from "@/components/ui/RelativeTime";')
+          text = text.replace('import { formatRelativeTime } from "@/lib/utils";' + chr(10), "")
+          text = text.replace('import Link from "next/link";', 'import Link from "next/link";' + chr(10) + 'import { RelativeTime } from "@/components/ui/RelativeTime";')
           text = text.replace('{formatRelativeTime(item.timestamp)}', '<RelativeTime timestamp={item.timestamp} />')
           dashboard.write_text(text)
           relative_time = root / "src/components/ui/RelativeTime.tsx"
-          relative_time.write_text("""\\\"use client\\\";
+          relative_time.write_text(""" "use client";
 
 import { useEffect, useState } from "react";
 
@@ -84,9 +84,9 @@ export function RelativeTime({ timestamp }: { timestamp: string }) {
     const date = new Date(timestamp);
     const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
     if (diffMin < 1) setLabel("just now");
-    else if (diffMin < 60) setLabel(\`${diffMin}m ago\`);
-    else if (diffMin < 1440) setLabel(\`${Math.floor(diffMin / 60)}h ago\`);
-    else if (diffMin < 10080) setLabel(\`${Math.floor(diffMin / 1440)}d ago\`);
+    else if (diffMin < 60) setLabel(`${diffMin}m ago`);
+    else if (diffMin < 1440) setLabel(`${Math.floor(diffMin / 60)}h ago`);
+    else if (diffMin < 10080) setLabel(`${Math.floor(diffMin / 1440)}d ago`);
     else setLabel(date.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
   }, [timestamp]);
 
