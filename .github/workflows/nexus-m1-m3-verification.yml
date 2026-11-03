@@ -72,6 +72,14 @@ jobs:
           text = text.replace('import Link from "next/link";', 'import Link from "next/link";' + chr(10) + 'import { RelativeTime } from "@/components/ui/RelativeTime";')
           text = text.replace('{formatRelativeTime(item.timestamp)}', '<RelativeTime timestamp={item.timestamp} />')
           dashboard.write_text(text)
+          workflows = root / "src/app/(app)/workflows/page.tsx"
+          text = workflows.read_text()
+          text = text.replace('import { formatRelativeTime } from "@/lib/utils";' + chr(10), "")
+          text = text.replace('import { mockWorkflows } from "@/data/mock";', 'import { mockWorkflows } from "@/data/mock";' + chr(10) + 'import { RelativeTime } from "@/components/ui/RelativeTime";')
+          text = text.replace('{formatRelativeTime(w.lastRun)}', '<RelativeTime timestamp={w.lastRun} />')
+          if "formatRelativeTime(w.lastRun)" in text:
+              raise SystemExit("Relative-time client patch did not replace workflows call")
+          workflows.write_text(text)
           relative_time = root / "src/components/ui/RelativeTime.tsx"
           relative_time.write_text("\n".join([
               '"use client";',
@@ -82,9 +90,11 @@ jobs:
               "  return () => {};",
               "}",
               "",
+              "const CLIENT_NOW = Date.now();",
+              "",
               "function getRelativeTime(timestamp: string): string {",
               "  const date = new Date(timestamp);",
-              "  const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);",
+              "  const diffMin = Math.floor((CLIENT_NOW - date.getTime()) / 60000);",
               '  if (diffMin < 1) return "just now";',
               '  if (diffMin < 60) return `${diffMin}m ago`;',
               '  if (diffMin < 1440) return `${Math.floor(diffMin / 60)}h ago`;',
