@@ -34,18 +34,18 @@ jobs:
           root = Path("frontend/nexus-m1-review")
           dashboard = root / "src/app/(app)/dashboard/page.tsx"
           text = dashboard.read_text()
-          text = text.replace('import { connection } from "next/server";\\n', "")
-          text = text.replace('export default async function DashboardPage() {\\n  await connection();', "export default function DashboardPage() {")
+          text = text.replace('import { connection } from "next/server";\n', "")
+          text = text.replace('export default async function DashboardPage() {\n  await connection();', "export default function DashboardPage() {")
           if "export const instant = false;" not in text:
-              text = "export const instant = false;\\n" + text
-          text = text.replace('import { formatRelativeTime } from "@/lib/utils";\\n', "")
-          text = text.replace('import Link from "next/link";', 'import Link from "next/link";\\nimport { RelativeTime } from "@/components/ui/RelativeTime";')
+              text = "export const instant = false;\n" + text
+          text = text.replace('import { formatRelativeTime } from "@/lib/utils";\n', "")
+          text = text.replace('import Link from "next/link";', 'import Link from "next/link";\nimport { RelativeTime } from "@/components/ui/RelativeTime";')
           text = text.replace('{formatRelativeTime(item.timestamp)}', '<RelativeTime timestamp={item.timestamp} />')
           dashboard.write_text(text)
           workflows = root / "src/app/(app)/workflows/page.tsx"
           text = workflows.read_text()
-          text = text.replace('import { formatRelativeTime } from "@/lib/utils";\\n', "")
-          text = text.replace('import { mockWorkflows } from "@/data/mock";', 'import { mockWorkflows } from "@/data/mock";\\nimport { RelativeTime } from "@/components/ui/RelativeTime";')
+          text = text.replace('import { formatRelativeTime } from "@/lib/utils";\n', "")
+          text = text.replace('import { mockWorkflows } from "@/data/mock";', 'import { mockWorkflows } from "@/data/mock";\nimport { RelativeTime } from "@/components/ui/RelativeTime";')
           text = text.replace('{formatRelativeTime(w.lastRun)}', '<RelativeTime timestamp={w.lastRun} />')
           workflows.write_text(text)
           relative = root / "src/components/ui/RelativeTime.tsx"
