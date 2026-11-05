@@ -2,6 +2,10 @@ name: NEXUS Swarm Phase B verification
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -12,6 +16,7 @@ concurrency:
 
 jobs:
   web-verification:
+    if: github.event_name != 'pull_request' || github.head_ref == 'feat/nexus-swarm-visualization'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
