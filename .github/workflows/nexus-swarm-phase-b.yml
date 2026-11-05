@@ -1,0 +1,121 @@
+name: NEXUS Swarm Phase B verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-swarm-phase-b
+  cancel-in-progress: true
+
+jobs:
+  web-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/nexus-swarm-visualization
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Extract the reconciled M1 source archive
+        run: |
+          mkdir -p frontend/nexus-m1-review
+          unzip -q NEXUS-AI-M1-source-for-verification.zip -d frontend/nexus-m1-review
+          test -f frontend/nexus-m1-review/package.json
+          test -f frontend/nexus-m1-review/src/components/layout/MobileNavigation.tsx
+          echo "Extracted source files: $(find frontend/nexus-m1-review -type f | wc -l)"
+      - name: Apply deterministic M1-M3 compatibility fixes
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          root = Path("frontend/nexus-m1-review")
+          dashboard = root / "src/app/(app)/dashboard/page.tsx"
+          text = dashboard.read_text()
+          text = text.replace('import { connection } from "next/server";\\n', "")
+          text = text.replace('export default async function DashboardPage() {\\n  await connection();', "export default function DashboardPage() {")
+          if "export const instant = false;" not in text:
+              text = "export const instant = false;\\n" + text
+          text = text.replace('import { formatRelativeTime } from "@/lib/utils";\\n', "")
+          text = text.replace('import Link from "next/link";', 'import Link from "next/link";\\nimport { RelativeTime } from "@/components/ui/RelativeTime";')
+          text = text.replace('{formatRelativeTime(item.timestamp)}', '<RelativeTime timestamp={item.timestamp} />')
+          dashboard.write_text(text)
+          workflows = root / "src/app/(app)/workflows/page.tsx"
+          text = workflows.read_text()
+          text = text.replace('import { formatRelativeTime } from "@/lib/utils";\\n', "")
+          text = text.replace('import { mockWorkflows } from "@/data/mock";', 'import { mockWorkflows } from "@/data/mock";\\nimport { RelativeTime } from "@/components/ui/RelativeTime";')
+          text = text.replace('{formatRelativeTime(w.lastRun)}', '<RelativeTime timestamp={w.lastRun} />')
+          workflows.write_text(text)
+          relative = root / "src/components/ui/RelativeTime.tsx"
+          relative.parent.mkdir(parents=True, exist_ok=True)
+          relative.write_text('''"use client";\nimport { useSyncExternalStore } from "react";\nfunction subscribe() { return () => {}; }\nfunction getRelativeTime(timestamp: string) {\n  const date = new Date(timestamp);\n  const minutes = Math.floor((Date.now() - date.getTime()) / 60000);\n  if (minutes < 1) return "just now";\n  if (minutes < 60) return `${minutes}m ago`;\n  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;\n  if (minutes < 10080) return `${Math.floor(minutes / 1440)}d ago`;\n  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });\n}\nexport function RelativeTime({ timestamp }: { timestamp: string }) {\n  const value = useSyncExternalStore(subscribe, () => getRelativeTime(timestamp), () => "—");\n  return <>{value}</>;\n}\n''')
+          print("Applied deterministic relative-time rendering compatibility.")
+          PY
+      - name: Apply Phase B Swarm integration
+        run: |
+          cp -R phase-b-swarm/src/. frontend/nexus-m1-review/src/
+          test -f frontend/nexus-m1-review/src/app/'(app)'/swarm/page.tsx
+          grep -q 'href: "/swarm"' frontend/nexus-m1-review/src/components/layout/nav-items.ts
+          grep -q 'subscribeFrames' frontend/nexus-m1-review/src/lib/swarm/engine.ts
+          echo "Phase B source overlay applied."
+      - name: Install dependencies without creating a lockfile
+        working-directory: frontend/nexus-m1-review
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
+      - name: ESLint
+        working-directory: frontend/nexus-m1-review
+        run: npm run lint
+      - name: TypeScript
+        working-directory: frontend/nexus-m1-review
+        run: npx tsc --noEmit
+      - name: Next.js production build
+        working-directory: frontend/nexus-m1-review
+        run: npm run build
+      - name: Start production server
+        working-directory: frontend/nexus-m1-review
+        run: |
+          (npm run start -- --hostname 127.0.0.1 > /tmp/nexus-swarm-next.log 2>&1 & echo $! > /tmp/nexus-swarm-next.pid)
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/swarm >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/nexus-swarm-next.log
+          exit 1
+      - name: Verify application routes
+        run: |
+          set -e
+          for route in / /home /dashboard /chat /projects /tasks /agents /workflows /tools /activity /settings /swarm; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000$route")
+            case "$code" in 200|307|308) echo "$route -> $code" ;; *) echo "::error::$route returned $code"; exit 1 ;; esac
+          done
+      - name: Install Playwright Chromium
+        working-directory: frontend/nexus-m1-review
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts playwright --registry=https://registry.npmjs.org --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Mobile viewport and Swarm navigation checks
+        working-directory: frontend/nexus-m1-review
+        run: |
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            try {
+              for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 800 }, { width: 768, height: 1024 }]) {
+                const page = await browser.newPage({ viewport });
+                for (const route of ['/home', '/chat', '/workflows', '/swarm']) {
+                  const response = await page.goto('http://127.0.0.1:3000' + route, { waitUntil: 'networkidle' });
+                  if (!response || response.status() >= 400) throw new Error(route + ' failed at width ' + viewport.width);
+                  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+                  if (overflow) throw new Error('Horizontal overflow on ' + route + ' at width ' + viewport.width);
+                  if (route === '/swarm' && viewport.width < 768) {
+                    const link = page.locator('nav[aria-label="Primary mobile navigation"] a[href="/swarm"]');
+                    if (!(await link.isVisible())) throw new Error('Swarm mobile navigation link is missing');
+                  }
+                }
+                await page.close();
+              }
+            } finally { await browser.close(); }
+          })().catch(error => { console.error(error); process.exit(1); });
+          NODE
