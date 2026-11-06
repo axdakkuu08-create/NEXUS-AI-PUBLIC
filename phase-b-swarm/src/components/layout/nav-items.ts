@@ -5,7 +5,7 @@ export const mainNav = [
   { href: "/agents", label: "Agents", icon: "Bot" },
   { href: "/swarm", label: "Swarm", icon: "Sparkles" },
   { href: "/tasks", label: "Tasks", icon: "ListTodo" },
-  { href: "/tools", label: "Integrations", icon: "Wrench" },
+  { href: "/tools", label: "Tools", icon: "Wrench" },
   { href: "/activity", label: "Activity", icon: "Activity" },
 ] as const;
 
