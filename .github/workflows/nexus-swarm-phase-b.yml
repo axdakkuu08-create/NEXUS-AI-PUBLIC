@@ -115,7 +115,7 @@ jobs:
             try {
               for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 800 }, { width: 768, height: 1024 }]) {
                 const page = await browser.newPage({ viewport });
-                for (const route of ['/home', '/chat', '/workflows', '/swarm']) {
+                for (const route of ['/home', '/dashboard', '/chat', '/workflows', '/swarm']) {
                   const response = await page.goto('http://127.0.0.1:3000' + route, { waitUntil: 'networkidle' });
                   if (!response || response.status() >= 400) throw new Error(route + ' failed at width ' + viewport.width);
                   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
