@@ -77,6 +77,7 @@ export class SwarmEngine {
 
   subscribe(listener: (snapshot: SwarmEngineSnapshot) => void) {
     this.listeners.add(listener);
+    listener(this.getSnapshot());
     return () => this.listeners.delete(listener);
   }
 
