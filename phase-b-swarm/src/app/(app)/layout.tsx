@@ -102,7 +102,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [drawerOpen]);
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden">
+    <div className="ambient-glow flex h-[100dvh] overflow-hidden">
       {drawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <button
