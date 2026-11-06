@@ -78,13 +78,17 @@ export class SwarmEngine {
   subscribe(listener: (snapshot: SwarmEngineSnapshot) => void) {
     this.listeners.add(listener);
     listener(this.getSnapshot());
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   /** Canvas subscribers are notified per frame without scheduling React renders. */
   subscribeFrames(listener: () => void) {
     this.frameListeners.add(listener);
-    return () => this.frameListeners.delete(listener);
+    return () => {
+      this.frameListeners.delete(listener);
+    };
   }
 
   private emitState() {

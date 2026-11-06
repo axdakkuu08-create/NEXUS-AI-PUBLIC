@@ -42,8 +42,12 @@ export function SwarmMonitor() {
       reducedMotion: initialReducedMotion,
       simulation: true,
     });
-    setEngine(instance);
-    const unsubscribe = instance.subscribe((snapshot) => setCursors(snapshot.cursors));
+    const unsubscribe = instance.subscribe((snapshot) => {
+      // The engine is published from its own subscription notification, not the
+      // effect body, so this state update follows the external-store pattern.
+      setEngine(instance);
+      setCursors(snapshot.cursors);
+    });
     const onMotionChange = (event: MediaQueryListEvent) => {
       instance.setReducedMotion(event.matches);
     };
