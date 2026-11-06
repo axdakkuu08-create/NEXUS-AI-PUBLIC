@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - main
+      - chore/m1-m3-verification-assets
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -27,7 +28,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: feat/nexus-swarm-visualization
+          # Test the synthetic PR merge commit; push/dispatch use their branch commit.
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -123,6 +125,30 @@ jobs:
                   if (route === '/swarm' && viewport.width < 768) {
                     const link = page.locator('nav[aria-label="Primary mobile navigation"] a[href="/swarm"]');
                     if (!(await link.isVisible())) throw new Error('Swarm mobile navigation link is missing');
+                  }
+                  if (route === '/home' && viewport.width < 768) {
+                    const menuButton = page.getByRole('button', { name: 'Open menu' });
+                    await menuButton.click();
+                    const dialog = page.getByRole('dialog', { name: 'NEXUS-AI navigation' });
+                    if (!(await dialog.isVisible())) throw new Error('Mobile navigation dialog did not open');
+                    const closeButton = dialog.getByRole('button', { name: 'Close menu' });
+                    if (!(await closeButton.evaluate((element) => element === document.activeElement))) {
+                      throw new Error('Focus was not moved into the navigation dialog');
+                    }
+                    await page.keyboard.press('Shift+Tab');
+                    const lastLink = dialog.locator('a[href]').last();
+                    if (!(await lastLink.evaluate((element) => element === document.activeElement))) {
+                      throw new Error('Shift+Tab did not wrap focus to the last drawer link');
+                    }
+                    await page.keyboard.press('Tab');
+                    if (!(await closeButton.evaluate((element) => element === document.activeElement))) {
+                      throw new Error('Tab did not wrap focus to the first drawer control');
+                    }
+                    await page.keyboard.press('Escape');
+                    if (await dialog.count()) throw new Error('Escape did not close the navigation dialog');
+                    if (!(await menuButton.evaluate((element) => element === document.activeElement))) {
+                      throw new Error('Focus was not restored to the menu trigger');
+                    }
                   }
                 }
                 await page.close();
