@@ -50,5 +50,7 @@ PY
 cp -R phase-b-swarm/src/. "$ROOT/src/"
 test -f "$ROOT/package.json"
 test -f "$ROOT/src/app/(app)/swarm/page.tsx"
-cd "$ROOT"
+cp -R "$ROOT"/. .
+test -f package.json
+grep -q '"next": "16.4.3"' package.json
 npm install --no-package-lock --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
