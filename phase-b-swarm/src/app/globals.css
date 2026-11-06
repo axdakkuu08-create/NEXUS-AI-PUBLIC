@@ -1,50 +1,50 @@
 @import "tailwindcss";
 
-/* NEXUS-AI Aurora Glass: obsidian surfaces with restrained blue/cyan light. */
+/* NEXUS-AI Obsidian Glass: obsidian foundation with balanced cyan and violet accents. */
 :root {
   color-scheme: dark;
-  --bg-base: #070a10;
-  --bg-elevated: #0d121c;
-  --bg-surface: #121b29;
-  --bg-hover: #19263a;
-  --border: #26364d;
-  --border-subtle: #1a2637;
-  --text-primary: #edf4ff;
-  --text-secondary: #a0b1c8;
-  --text-tertiary: #71839d;
-  --accent: #58b9ff;
-  --accent-hover: #83ccff;
-  --accent-muted: rgba(68, 167, 255, 0.13);
-  --accent-glow: rgba(68, 167, 255, 0.28);
-  --accent-blue: #48e0e8;
-  --accent-violet: #9b8cff;
-  --success: #43d6b0;
-  --warning: #f5bd62;
-  --danger: #ff7185;
-  --info: #62c5ff;
+  --bg-base: #05070D;
+  --bg-elevated: #0B101A;
+  --bg-surface: #111A28;
+  --bg-hover: #19263A;
+  --border: #29384F;
+  --border-subtle: #1B2738;
+  --text-primary: #F0F6FF;
+  --text-secondary: #A6B6CC;
+  --text-tertiary: #788BA5;
+  --accent: #00D9FF;
+  --accent-hover: #65E8FF;
+  --accent-muted: rgba(0, 217, 255, 0.13);
+  --accent-glow: rgba(0, 217, 255, 0.24);
+  --accent-blue: #00D9FF;
+  --accent-violet: #9B5CFF;
+  --success: #43D6B0;
+  --warning: #F5BD62;
+  --danger: #FF7185;
+  --info: #63C7FF;
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --bg-base: #f2f6fc;
-  --bg-elevated: #ffffff;
-  --bg-surface: #e9f0f9;
-  --bg-hover: #dce8f6;
-  --border: #c9d7e9;
-  --border-subtle: #e0e9f4;
+  --bg-base: #F3F6FC;
+  --bg-elevated: #FFFFFF;
+  --bg-surface: #EAF0F9;
+  --bg-hover: #DCE7F5;
+  --border: #CAD7E8;
+  --border-subtle: #E1E9F3;
   --text-primary: #142238;
-  --text-secondary: #4e627e;
-  --text-tertiary: #71839b;
-  --accent: #167ac2;
-  --accent-hover: #0d68aa;
-  --accent-muted: rgba(22, 122, 194, 0.1);
-  --accent-glow: rgba(22, 122, 194, 0.2);
-  --accent-blue: #078d9b;
-  --accent-violet: #7259c9;
-  --success: #138b70;
-  --warning: #a96a0a;
-  --danger: #c83d58;
-  --info: #167ac2;
+  --text-secondary: #4E627E;
+  --text-tertiary: #71839B;
+  --accent: #087FB5;
+  --accent-hover: #066A99;
+  --accent-muted: rgba(8, 127, 181, 0.10);
+  --accent-glow: rgba(8, 127, 181, 0.18);
+  --accent-blue: #087FB5;
+  --accent-violet: #7655C8;
+  --success: #138B70;
+  --warning: #A96A0A;
+  --danger: #C83D58;
+  --info: #167AC2;
 }
 
 @theme inline {
@@ -80,19 +80,19 @@ body {
   overflow-x: hidden;
 }
 
-/* Static ambient lighting: no animated gradients or large paint-heavy effects. */
+/* Static ambient lighting: no animated gradients or paint-heavy effects. */
 .ambient-glow {
   background:
-    radial-gradient(ellipse 64% 34% at 50% -18%, rgba(63, 157, 255, 0.105), transparent 72%),
-    radial-gradient(ellipse 42% 28% at 100% 0%, rgba(117, 103, 235, 0.055), transparent 76%),
+    radial-gradient(ellipse 64% 34% at 50% -18%, rgba(0, 217, 255, 0.075), transparent 72%),
+    radial-gradient(ellipse 42% 28% at 100% 0%, rgba(155, 92, 255, 0.055), transparent 76%),
     var(--bg-base);
 }
 
-/* Glossy appearance without backdrop-filter, keeping mobile compositing light. */
+/* Glossy glass appearance without backdrop-filter for lightweight mobile compositing. */
 .glass {
-  background: linear-gradient(145deg, rgba(22, 34, 51, 0.96), rgba(10, 16, 27, 0.96));
-  border: 1px solid rgba(111, 151, 198, 0.22);
-  box-shadow: inset 0 1px 0 rgba(231, 243, 255, 0.055);
+  background: linear-gradient(145deg, rgba(20, 31, 48, 0.97), rgba(8, 13, 23, 0.97));
+  border: 1px solid rgba(113, 151, 198, 0.22);
+  box-shadow: inset 0 1px 0 rgba(240, 246, 255, 0.06);
 }
 
 [data-theme="light"] .glass {
@@ -102,7 +102,7 @@ body {
 }
 
 .card-glow {
-  box-shadow: 0 0 0 1px rgba(88, 185, 255, 0.045), 0 6px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 0 1px rgba(0, 217, 255, 0.045), 0 6px 20px rgba(0, 0, 0, 0.20);
 }
 
 .accent-ring:focus-within {
