@@ -2,6 +2,9 @@ name: NEXUS Swarm Phase B verification
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feat/nexus-swarm-visualization
   pull_request:
     branches:
       - main
