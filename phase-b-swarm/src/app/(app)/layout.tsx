@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { AppHeader } from "@/components/layout/AppHeader";
@@ -48,15 +48,61 @@ const titles: Record<string, string> = {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const wasDrawerOpen = useRef(false);
   const pathname = usePathname();
   const title =
     titles[pathname] ??
     Object.entries(titles).find(([key]) => key !== "/" && pathname.startsWith(key))?.[1] ??
     "NEXUS-AI";
 
+  useEffect(() => {
+    if (!drawerOpen) {
+      if (wasDrawerOpen.current) {
+        document.querySelector<HTMLButtonElement>('button[aria-label="Open menu"]')?.focus();
+      }
+      wasDrawerOpen.current = false;
+      return;
+    }
+
+    wasDrawerOpen.current = true;
+    closeButtonRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setDrawerOpen(false);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const focusable = drawerRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) {
+        event.preventDefault();
+        drawerRef.current?.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [drawerOpen]);
+
   return (
     <div className="flex h-[100dvh] overflow-hidden">
-      <AppSidebar />
       {drawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <button
@@ -65,15 +111,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             className="absolute inset-0 h-full w-full bg-black/50"
             onClick={() => setDrawerOpen(false)}
           />
-          <div className="safe-top absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-[var(--border)] bg-[var(--bg-elevated)]">
+          <div
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-navigation-title"
+            tabIndex={-1}
+            className="safe-top absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-[var(--border)] bg-[var(--bg-elevated)]"
+          >
             <div className="flex h-14 items-center justify-between border-b border-[var(--border-subtle)] px-4">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)]/20 text-[var(--accent)]">
                   <Sparkles className="h-4 w-4" />
                 </div>
-                <span className="font-semibold">NEXUS-AI</span>
+                <h2 id="mobile-navigation-title" className="font-semibold">NEXUS-AI navigation</h2>
               </div>
-              <button type="button" onClick={() => setDrawerOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--text-secondary)]" aria-label="Close menu">
+              <button
+                ref={closeButtonRef}
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-[var(--text-secondary)]"
+                aria-label="Close menu"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -113,10 +172,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AppHeader title={title} onMenuClick={() => setDrawerOpen(true)} />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto pb-16 md:pb-0">{children}</main>
-        <MobileNavigation />
+      <div className="flex min-w-0 flex-1" inert={drawerOpen} aria-hidden={drawerOpen}>
+        <AppSidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <AppHeader title={title} onMenuClick={() => setDrawerOpen(true)} />
+          <main className="flex-1 overflow-x-hidden overflow-y-auto pb-16 md:pb-0">{children}</main>
+          <MobileNavigation />
+        </div>
       </div>
     </div>
   );
