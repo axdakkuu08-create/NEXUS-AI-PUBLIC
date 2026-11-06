@@ -1,10 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { SwarmEngine } from "@/lib/swarm/engine";
 import type { SwarmCursor, SwarmAgentState } from "@/lib/swarm/types";
 import { SwarmCanvas } from "./SwarmCanvas";
 import { cn } from "@/lib/cn";
+
+function subscribeToMotionPreference(onChange: () => void) {
+  const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+function getMotionPreference() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 const STATE_LABEL: Record<SwarmAgentState, string> = {
   idle: "Idle",
@@ -19,7 +29,7 @@ export function SwarmMonitor() {
   const [engine, setEngine] = useState<SwarmEngine | null>(null);
   const [cursors, setCursors] = useState<SwarmCursor[]>([]);
   const [size, setSize] = useState({ w: 800, h: 420 });
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const reducedMotion = useSyncExternalStore(subscribeToMotionPreference, getMotionPreference, () => false);
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
@@ -32,12 +42,9 @@ export function SwarmMonitor() {
       reducedMotion: initialReducedMotion,
       simulation: true,
     });
-    setReducedMotion(initialReducedMotion);
-    setCursors(instance.getSnapshot().cursors);
     setEngine(instance);
     const unsubscribe = instance.subscribe((snapshot) => setCursors(snapshot.cursors));
     const onMotionChange = (event: MediaQueryListEvent) => {
-      setReducedMotion(event.matches);
       instance.setReducedMotion(event.matches);
     };
     media.addEventListener("change", onMotionChange);
