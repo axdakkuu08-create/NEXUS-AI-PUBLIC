@@ -13,8 +13,11 @@ on:
 permissions:
   contents: read
 
+# One group per trigger so the push and pull_request runs for a single commit do
+# not cancel each other (a cancelled check makes the draft PR look unverified).
+# Superseded runs from the same trigger are still cancelled.
 concurrency:
-  group: nexus-swarm-phase-b
+  group: nexus-swarm-phase-b-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
