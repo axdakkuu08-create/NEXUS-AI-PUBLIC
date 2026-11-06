@@ -1,0 +1,201 @@
+name: NEXUS-AI M1-M3 verification
+
+on:
+  push:
+    branches:
+      - ci/verify-m1-m3-source
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-m1-m3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Extract supplied M1 source archive
+        run: |
+          mkdir -p frontend/nexus-m1-review
+          unzip -q NEXUS-AI-M1-source-for-verification.zip -d frontend/nexus-m1-review
+          test -f frontend/nexus-m1-review/package.json
+          test -f frontend/nexus-m1-review/tsconfig.json
+          test ! -f frontend/nexus-m1-review/package-lock.json
+          echo "Extracted source files: $(find frontend/nexus-m1-review -type f | wc -l)"
+          echo "Confirmed: no source lockfile is present; none will be generated."
+          echo "Applying route-type-safe navigation fix to extracted M1 source."
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          root = Path("frontend/nexus-m1-review")
+          layout = root / "src/app/(app)/layout.tsx"
+          text = layout.read_text()
+          text, n = re.subn(
+              r'const active =\s*item\.href === "/"\s*\? pathname === "/" \|\| pathname === "/home"\s*: pathname\.startsWith\(item\.href\);',
+              'const active = pathname === item.href || pathname.startsWith(`${item.href}/`);',
+              text, count=1)
+          if n != 1:
+              raise SystemExit(f"Expected one app-layout active-route block, found {n}")
+          text, n = re.subn(r'href=\{item\.href === "/" \? "/home" : item\.href\}', 'href={item.href}', text, count=1)
+          if n != 1:
+              raise SystemExit(f"Expected one drawer href mapping, found {n}")
+          layout.write_text(text)
+          mobile = root / "src/components/layout/MobileNavigation.tsx"
+          text = mobile.read_text()
+          text, n = re.subn(
+              r'const active =\s*item\.href === "/"\s*\? pathname === "/" \|\| pathname === ""\s*: pathname\.startsWith\(item\.href\);',
+              'const active = pathname === item.href || pathname.startsWith(`${item.href}/`);',
+              text, count=1)
+          if n != 1:
+              raise SystemExit(f"Expected one mobile active-route block, found {n}")
+          mobile.write_text(text)
+          print("Patched route comparisons in both navigation components.")
+          dashboard = root / "src/app/(app)/dashboard/page.tsx"
+          text = dashboard.read_text()
+          text = text.replace('import { connection } from "next/server";\n', "")
+          text = text.replace('export default async function DashboardPage() {\n  await connection();', "export default function DashboardPage() {")
+          if "export const instant = false;" not in text:
+              text = "export const instant = false;\n" + text
+          if "await connection();" in text or 'import { connection } from "next/server";' in text:
+              raise SystemExit("Unexpected connection() patch remains in dashboard")
+          dashboard.write_text(text)
+          # Move wall-clock relative-time formatting to the browser to keep prerender deterministic.
+          text = dashboard.read_text()
+          text = text.replace('import { formatRelativeTime } from "@/lib/utils";' + chr(10), "")
+          text = text.replace('import Link from "next/link";', 'import Link from "next/link";' + chr(10) + 'import { RelativeTime } from "@/components/ui/RelativeTime";')
+          text = text.replace('{formatRelativeTime(item.timestamp)}', '<RelativeTime timestamp={item.timestamp} />')
+          dashboard.write_text(text)
+          workflows = root / "src/app/(app)/workflows/page.tsx"
+          text = workflows.read_text()
+          text = text.replace('import { formatRelativeTime } from "@/lib/utils";' + chr(10), "")
+          text = text.replace('import { mockWorkflows } from "@/data/mock";', 'import { mockWorkflows } from "@/data/mock";' + chr(10) + 'import { RelativeTime } from "@/components/ui/RelativeTime";')
+          text = text.replace('{formatRelativeTime(w.lastRun)}', '<RelativeTime timestamp={w.lastRun} />')
+          if "formatRelativeTime(w.lastRun)" in text:
+              raise SystemExit("Relative-time client patch did not replace workflows call")
+          workflows.write_text(text)
+          relative_time = root / "src/components/ui/RelativeTime.tsx"
+          relative_time.write_text("\n".join([
+              '"use client";',
+              "",
+              'import { useSyncExternalStore } from "react";',
+              "",
+              "function subscribeToNoChanges() {",
+              "  return () => {};",
+              "}",
+              "",
+              "const CLIENT_NOW = Date.now();",
+              "",
+              "function getRelativeTime(timestamp: string): string {",
+              "  const date = new Date(timestamp);",
+              "  const diffMin = Math.floor((CLIENT_NOW - date.getTime()) / 60000);",
+              '  if (diffMin < 1) return "just now";',
+              '  if (diffMin < 60) return `${diffMin}m ago`;',
+              '  if (diffMin < 1440) return `${Math.floor(diffMin / 60)}h ago`;',
+              '  if (diffMin < 10080) return `${Math.floor(diffMin / 1440)}d ago`;',
+              '  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });',
+              "}",
+              "",
+              "export function RelativeTime({ timestamp }: { timestamp: string }) {",
+              "  const label = useSyncExternalStore(",
+              "    subscribeToNoChanges,",
+              "    () => getRelativeTime(timestamp),",
+              '    () => "—",',
+              "  );",
+              "  return <>{label}</>;",
+              "}",
+              "",
+          ]))
+          generated = relative_time.read_text()
+          if not generated.startswith('"use client";'):
+              raise SystemExit("RelativeTime.tsx is missing its client directive")
+          if "formatRelativeTime(item.timestamp)" in dashboard.read_text():
+              raise SystemExit("Relative-time client patch did not replace dashboard call")
+          print("Moved relative-time formatting to a client component for deterministic prerendering.")
+          PY
+      - name: Install dependencies without creating a lockfile
+        working-directory: frontend/nexus-m1-review
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
+      - name: Confirm no lockfile was generated
+        working-directory: frontend/nexus-m1-review
+        run: test ! -f package-lock.json
+      - name: ESLint
+        working-directory: frontend/nexus-m1-review
+        run: npm run lint
+      - name: TypeScript
+        working-directory: frontend/nexus-m1-review
+        run: npx tsc --noEmit
+      - name: Next.js production build
+        working-directory: frontend/nexus-m1-review
+        run: npm run build
+      - name: Start production server
+        working-directory: frontend/nexus-m1-review
+        run: |
+          (npm run start -- --hostname 127.0.0.1 > /tmp/nexus-next.log 2>&1 & echo $! > /tmp/nexus-next.pid)
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/nexus-next.log
+          exit 1
+      - name: Verify all application routes
+        run: |
+          set -e
+          for route in / /home /dashboard /chat /projects /tasks /agents /workflows /tools /activity /settings; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000$route")
+            case "$code" in
+              200|307|308) echo "$route -> $code" ;;
+              *) echo "::error::$route returned $code"; exit 1 ;;
+            esac
+          done
+      - name: Install Playwright browser
+        working-directory: frontend/nexus-m1-review
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts playwright --registry=https://registry.npmjs.org --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Mobile viewport smoke tests
+        working-directory: frontend/nexus-m1-review
+        run: |
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            try {
+              for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 800 }, { width: 768, height: 1024 }]) {
+                const page = await browser.newPage({ viewport });
+                for (const route of ['/home', '/chat', '/workflows']) {
+                  const response = await page.goto('http://127.0.0.1:3000' + route, { waitUntil: 'networkidle' });
+                  if (!response || response.status() >= 400) throw new Error(route + ' failed at ' + viewport.width);
+                  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+                  if (overflow) throw new Error('Horizontal overflow on ' + route + ' at ' + viewport.width);
+                }
+                await page.close();
+              }
+            } finally {
+              await browser.close();
+            }
+          })().catch(error => { console.error(error); process.exit(1); });
+          NODE
+
+  android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Android wrapper exists
+        id: wrapper
+        run: |
+          if unzip -Z1 NEXUS-AI-M1-source-for-verification.zip | grep -Eq '(^|/)capacitor.config\.(ts|json)$'; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::APK export is not applicable: supplied M1 archive has no Capacitor configuration or Android wrapper."
+          fi
+      - name: Report Android packaging status
+        if: steps.wrapper.outputs.present == 'false'
+        run: echo "SKIPPED — the supplied archive is a web frontend and contains no Android project."
