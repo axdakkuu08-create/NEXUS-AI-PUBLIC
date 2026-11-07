@@ -3,7 +3,7 @@
 ## Decisions
 
 - Convex is the primary database and server-function platform.
-- Clerk is the recommended first identity provider, but the provider decision and issuer are not yet approved. Provider-specific `auth.config.ts` is intentionally deferred until the issuer is supplied. Public functions require `ctx.auth.getUserIdentity()` and fail closed for anonymous callers.
+- Clerk is the selected first identity provider. The supplied development Frontend API URL was verified against its OpenID Connect discovery metadata: the returned `issuer` exactly matches the configured domain, and the advertised JWKS endpoint is reachable. `convex/auth.config.ts` configures this issuer with Convex application ID `convex`.
 - User-owned records are partitioned by Convex identity `tokenIdentifier`. Every public data query and mutation requires an authenticated identity and checks ownership of referenced records.
 - AI integration remains server-side and provider-independent. M1 adds no provider SDK, API key, model call, or frontend secret. M2 should add a server-side provider adapter and keep credentials in Convex environment variables.
 - Conversation metadata is stored in M1. Message history and agent threads are deferred to the Convex Agent component in M2 instead of creating a parallel custom chat-message store.
@@ -31,8 +31,11 @@ The isolated `convex-test` suite must verify:
 3. Cross-owner project/task references are rejected by public mutations and queries. Internal activity writes must also reject references owned by another user.
 4. A normal preferences update creates at most one row. If legacy or manually seeded duplicate rows exist, both read and update fail closed with an explicit remediation error. The application does not silently select or delete a duplicate.
 
-These tests use mocked Convex identities and an in-memory Convex test backend. They validate function logic and ownership checks, not a real JWT issuer or a deployed Convex environment.
+These tests use mocked Convex identities and an in-memory Convex test backend. They validate function logic and ownership checks, not a real Clerk JWT or a deployed Convex environment. Live authentication remains unverified until the auth configuration is synced to an isolated non-production Convex deployment and exercised with a real Clerk session.
 
 ## Setup gates
 
-Before connecting a deployment, approve the identity provider and configure its verified JWT issuer in the Convex auth configuration and deployment environment. Do not use production credentials or deploy production as part of M1. Frontend providers and live UI wiring are a separate M2 step.
+- The Clerk issuer URL is verified and committed only as public configuration; no secret keys or credentials are stored in the repository.
+- Before live authentication testing, activate the Convex integration for this Clerk application and sync the configuration to a separate non-production Convex deployment.
+- Frontend Clerk SDK/provider wiring and authenticated UI flows are a separate M2 step.
+- Do not deploy production or merge this branch as part of M1.
