@@ -17,49 +17,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  generate-lockfile:
-    if: github.ref == 'refs/heads/feat/nexus-backend-foundation'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: true
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-      - name: Generate npm lockfile from committed package manifest
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund --lockfile-version=3
-      - name: Verify lockfile with a clean install
-        run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Commit generated lockfile to feature branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -s package-lock.json
-          node -e "const p=require('./package.json'); const l=require('./package-lock.json'); const norm=x=>Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))); if (l.lockfileVersion !== 3 || l.packages?.['']?.name !== p.name || JSON.stringify(norm(l.packages[''].dependencies)) !== JSON.stringify(norm(p.dependencies)) || JSON.stringify(norm(l.packages[''].devDependencies)) !== JSON.stringify(norm(p.devDependencies))) process.exit(1)"
-          git add package-lock.json
-          if git diff --cached --quiet -- package-lock.json; then
-            echo "Lockfile already matches the committed manifest."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "build: add reproducible npm lockfile"
-          git push origin HEAD:feat/nexus-backend-foundation
-
   backend-verification:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - name: Install dependencies
-        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Generate Convex types and validate backend on an isolated anonymous deployment
         env:
           CONVEX_AGENT_MODE: anonymous
