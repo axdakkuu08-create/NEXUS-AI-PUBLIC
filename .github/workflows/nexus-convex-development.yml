@@ -1,0 +1,85 @@
+name: NEXUS Convex development deployment
+
+on:
+  push:
+    branches:
+      - feat/nexus-backend-foundation
+  workflow_dispatch:
+    inputs:
+      target_deployment:
+        description: "Must exactly match the approved Development deployment"
+        required: true
+        type: choice
+        options:
+          - shocking-salamander-814
+      authorize_development_deploy:
+        description: "Explicitly authorize syncing backend code to this Development deployment"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-convex-dev-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  safety-check:
+    name: Validate development-only deployment guardrails
+    if: github.ref == 'refs/heads/feat/nexus-backend-foundation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify branch, target configuration, and Clerk issuer
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/feat/nexus-backend-foundation"
+          test -f convex/auth.config.ts
+          grep -Fq 'domain: "https://charmed-goshawk-6691.clerk.accounts.dev"' convex/auth.config.ts
+          grep -Fq 'applicationID: "convex"' convex/auth.config.ts
+          node -e "const p=require('./package.json'); if (!p.dependencies?.convex) process.exit(1);"
+          echo "Guardrails passed. This job does not contact or deploy to Convex."
+
+  deploy-development:
+    name: Deploy only to NEXUS-AI Development
+    needs: safety-check
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/feat/nexus-backend-foundation' &&
+      inputs.authorize_development_deploy == true &&
+      inputs.target_deployment == 'shocking-salamander-814'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: nexus-development
+    env:
+      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEV_DEPLOY_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Fail closed unless the credential is scoped to the approved development deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${CONVEX_DEPLOY_KEY:-}" ]]; then
+            echo "::error::CONVEX_DEV_DEPLOY_KEY is not configured."
+            exit 1
+          fi
+          case "$CONVEX_DEPLOY_KEY" in
+            dev:shocking-salamander-814\|*) ;;
+            *)
+              echo "::error::Credential is not scoped to dev:shocking-salamander-814. Refusing deployment."
+              exit 1
+              ;;
+          esac
+      - name: Sync Convex backend to the scoped Development deployment
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEV_DEPLOY_KEY }}
+        run: npx convex dev --once --typecheck enable
