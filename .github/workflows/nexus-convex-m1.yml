@@ -1,0 +1,36 @@
+name: NEXUS Convex M1 backend verification
+
+on:
+  push:
+    branches:
+      - feat/nexus-backend-foundation
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-convex-m1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Generate Convex types and validate backend on an isolated anonymous deployment
+        env:
+          CONVEX_AGENT_MODE: anonymous
+          CLERK_JWT_ISSUER_DOMAIN: https://nexus-m1-ci.example.clerk.accounts.dev
+        run: npx convex dev --once --typecheck enable
+      - name: Strict backend TypeScript check
+        run: npx tsc --noEmit -p convex/tsconfig.json
