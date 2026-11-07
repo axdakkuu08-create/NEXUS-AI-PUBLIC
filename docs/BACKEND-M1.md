@@ -3,7 +3,7 @@
 ## Decisions
 
 - Convex is the primary database and server-function platform.
-- Clerk is the recommended first identity provider, but the provider decision and issuer are not yet approved. Provider-specific `auth.config.ts` is intentionally deferred until the issuer is supplied. Public functions already require `ctx.auth.getUserIdentity()` and fail closed for anonymous callers.
+- Clerk is the recommended first identity provider, but the provider decision and issuer are not yet approved. Provider-specific `auth.config.ts` is intentionally deferred until the issuer is supplied. Public functions require `ctx.auth.getUserIdentity()` and fail closed for anonymous callers.
 - User-owned records are partitioned by Convex identity `tokenIdentifier`. Every public data query and mutation requires an authenticated identity and checks ownership of referenced records.
 - AI integration remains server-side and provider-independent. M1 adds no provider SDK, API key, model call, or frontend secret. M2 should add a server-side provider adapter and keep credentials in Convex environment variables.
 - Conversation metadata is stored in M1. Message history and agent threads are deferred to the Convex Agent component in M2 instead of creating a parallel custom chat-message store.
@@ -21,6 +21,17 @@
 - Tools: list integration metadata only; no credentials are stored.
 - Activity: list; trusted internal activity writes only.
 - Preferences: get, update.
+
+## Runtime security test gate
+
+The isolated `convex-test` suite must verify:
+
+1. Anonymous callers are rejected by every public M1 query and mutation.
+2. Authenticated users only list their own projects, conversations, tasks, agents, activity, and tool-integration metadata; preferences are private to their owner.
+3. Cross-owner project/task references are rejected by public mutations and queries. Internal activity writes must also reject references owned by another user.
+4. A normal preferences update creates at most one row. If legacy or manually seeded duplicate rows exist, both read and update fail closed with an explicit remediation error. The application does not silently select or delete a duplicate.
+
+These tests use mocked Convex identities and an in-memory Convex test backend. They validate function logic and ownership checks, not a real JWT issuer or a deployed Convex environment.
 
 ## Setup gates
 
