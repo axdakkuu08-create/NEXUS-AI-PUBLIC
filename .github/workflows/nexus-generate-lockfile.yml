@@ -1,6 +1,11 @@
 name: Generate and verify NEXUS npm lockfile
 
 on:
+  push:
+    branches:
+      - feat/nexus-backend-foundation
+    paths:
+      - .github/workflows/nexus-generate-lockfile.yml
   workflow_dispatch:
 
 permissions:
