@@ -30,8 +30,9 @@ jobs:
       - name: Generate Convex types and validate backend on an isolated anonymous deployment
         env:
           CONVEX_AGENT_MODE: anonymous
-          CLERK_JWT_ISSUER_DOMAIN: https://nexus-m1-ci.example.clerk.accounts.dev
         run: npx convex dev --once --typecheck enable
+      - name: Run M1 runtime security tests
+        run: npm run test:backend
       - name: Strict backend TypeScript check
         run: npx tsc --noEmit -p convex/tsconfig.json
       - name: Preserve generated Convex types for review
