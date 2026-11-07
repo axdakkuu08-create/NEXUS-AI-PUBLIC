@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "backend:typecheck": "convex codegen && tsc --noEmit -p convex/tsconfig.json"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -15,7 +16,8 @@
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "tailwind-merge": "^2.5.4"
+    "tailwind-merge": "^2.5.4",
+    "convex": "1.48.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
