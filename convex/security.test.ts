@@ -3,7 +3,7 @@ import { expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 
-const modules = import.meta.glob("./{projects,conversations,tasks,agents,activity,preferences,tools}.ts");
+const modules = import.meta.glob("./**/*.ts");
 
 const aliceIdentity = {
   issuer: "https://nexus-m1-test.example",
