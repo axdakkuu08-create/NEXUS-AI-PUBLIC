@@ -39,7 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s package-lock.json
-          node -e "const p=require('./package.json'); const l=require('./package-lock.json'); if (l.lockfileVersion !== 3 || l.packages?.['']?.name !== p.name || JSON.stringify(l.packages[''].dependencies) !== JSON.stringify(p.dependencies) || JSON.stringify(l.packages[''].devDependencies) !== JSON.stringify(p.devDependencies)) process.exit(1)"
+          node -e "const p=require('./package.json'); const l=require('./package-lock.json'); const norm=x=>Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))); if (l.lockfileVersion !== 3 || l.packages?.['']?.name !== p.name || JSON.stringify(norm(l.packages[''].dependencies)) !== JSON.stringify(norm(p.dependencies)) || JSON.stringify(norm(l.packages[''].devDependencies)) !== JSON.stringify(norm(p.devDependencies))) process.exit(1)"
           if git diff --quiet -- package-lock.json; then
             echo "Lockfile already matches the committed manifest."
             exit 0
