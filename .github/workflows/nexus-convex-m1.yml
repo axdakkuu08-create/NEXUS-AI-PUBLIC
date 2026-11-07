@@ -34,3 +34,11 @@ jobs:
         run: npx convex dev --once --typecheck enable
       - name: Strict backend TypeScript check
         run: npx tsc --noEmit -p convex/tsconfig.json
+      - name: Preserve generated Convex types for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-convex-generated-types
+          path: convex/_generated/
+          if-no-files-found: warn
+          retention-days: 7
