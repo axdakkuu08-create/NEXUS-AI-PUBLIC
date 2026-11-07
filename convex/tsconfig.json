@@ -8,7 +8,7 @@
     "esModuleInterop": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "types": ["node"]
+    "types": ["node", "vite/client"]
   },
   "include": ["./**/*.ts"]
 }
