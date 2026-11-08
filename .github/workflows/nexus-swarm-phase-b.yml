@@ -1,115 +1,104 @@
-name: NEXUS Swarm one-time source migration
+name: NEXUS Swarm Phase B verification
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/nexus-swarm-visualization
+  pull_request:
+    branches:
+      - main
+      - chore/m1-m3-verification-assets
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: nexus-swarm-source-migration
-  cancel-in-progress: false
+  group: nexus-swarm-phase-b-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  migrate:
-    if: github.event.head_commit.message == 'Prepare one-time ZIP-free Swarm source migration'
+  web-verification:
+    if: github.event_name != 'pull_request' || github.head_ref == 'feat/nexus-swarm-visualization'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Materialize ordinary application source
+      - name: Assert ZIP-free application source layout
         run: |
           set -euo pipefail
-          test ! -d src/app
-          mkdir -p /tmp/nexus-m1-source
-          unzip -q NEXUS-AI-M1-source-for-verification.zip -d /tmp/nexus-m1-source
-          test -f /tmp/nexus-m1-source/package.json
-          test -f /tmp/nexus-m1-source/src/app/layout.tsx
-          cp -R /tmp/nexus-m1-source/. .
-      - name: Apply deterministic relative-time rendering fix
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          root = Path("src")
-          dashboard = root / "app/(app)/dashboard/page.tsx"
-          text = dashboard.read_text()
-          text = text.replace('import { formatRelativeTime } from "@/lib/utils";' + chr(10), "")
-          text = text.replace('import Link from "next/link";', 'import Link from "next/link";' + chr(10) + 'import { RelativeTime } from "@/components/ui/RelativeTime";')
-          text = text.replace('{formatRelativeTime(item.timestamp)}', '<RelativeTime timestamp={item.timestamp} />')
-          dashboard.write_text(text)
-          workflows = root / "app/(app)/workflows/page.tsx"
-          text = workflows.read_text()
-          text = text.replace('import { formatRelativeTime } from "@/lib/utils";' + chr(10), "")
-          text = text.replace('import { mockWorkflows } from "@/data/mock";', 'import { mockWorkflows } from "@/data/mock";' + chr(10) + 'import { RelativeTime } from "@/components/ui/RelativeTime";')
-          text = text.replace('{formatRelativeTime(w.lastRun)}', '<RelativeTime timestamp={w.lastRun} />')
-          workflows.write_text(text)
-          relative = root / "components/ui/RelativeTime.tsx"
-          relative.write_text('''"use client";
-
-          import { useSyncExternalStore } from "react";
-
-          function subscribe() {
-            return () => {};
-          }
-
-          function getRelativeTime(timestamp: string): string {
-            const date = new Date(timestamp);
-            const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
-            if (minutes < 1) return "just now";
-            if (minutes < 60) return `${minutes}m ago`;
-            if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
-            if (minutes < 10080) return `${Math.floor(minutes / 1440)}d ago`;
-            return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-          }
-
-          export function RelativeTime({ timestamp }: { timestamp: string }) {
-            const value = useSyncExternalStore(subscribe, () => getRelativeTime(timestamp), () => "—");
-            return <>{value}</>;
-          }
-          ''')
-          PY
-      - name: Integrate Swarm and remove the overlay pipeline
-        run: |
-          set -euo pipefail
-          cp -R phase-b-swarm/src/. src/
+          test -f package.json
+          test -f next.config.ts
+          test -f tsconfig.json
           test -f "src/app/(app)/swarm/page.tsx"
           test -f src/lib/swarm/engine.ts
           test -f src/components/swarm/SwarmMonitor.tsx
-          rm -rf phase-b-swarm
-          rm -f scripts/prepare-vercel-preview.sh
-          rmdir scripts 2>/dev/null || true
-          rm -rf /tmp/nexus-m1-source
+          test ! -d phase-b-swarm
+          test ! -f scripts/prepare-vercel-preview.sh
+          echo "Swarm and NEXUS frontend are ordinary checked-in application source."
       - name: Install dependencies
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
       - name: ESLint
         run: npm run lint
       - name: TypeScript
         run: npm run typecheck
-      - name: Production build
+      - name: Next.js production build
         run: npm run build
-      - name: Verify production routes
+      - name: Start production server
         run: |
           (npm run start -- --hostname 127.0.0.1 > /tmp/nexus-swarm-next.log 2>&1 & echo $! > /tmp/nexus-swarm-next.pid)
           for i in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:3000/swarm >/dev/null; then break; fi
+            if curl --fail --silent http://127.0.0.1:3000/swarm >/dev/null; then exit 0; fi
             sleep 2
           done
+          cat /tmp/nexus-swarm-next.log
+          exit 1
+      - name: Verify application routes
+        run: |
+          set -e
           for route in / /home /dashboard /chat /projects /tasks /agents /workflows /tools /activity /settings /swarm; do
             code=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000$route")
-            case "$code" in 200|307|308) echo "$route -> $code" ;; *) cat /tmp/nexus-swarm-next.log; exit 1 ;; esac
+            case "$code" in 200|307|308) echo "$route -> $code" ;; *) echo "::error::$route returned $code"; exit 1 ;; esac
           done
-      - name: Commit migrated source to the feature branch
+      - name: Install Playwright Chromium
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Migrate NEXUS Swarm to checked-in application source"
-          git push origin HEAD:feat/nexus-swarm-visualization
+          npm install --no-save --package-lock=false --ignore-scripts playwright --registry=https://registry.npmjs.org --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Mobile Swarm and navigation checks
+        run: |
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            try {
+              for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 800 }, { width: 768, height: 1024 }]) {
+                const page = await browser.newPage({ viewport });
+                const response = await page.goto('http://127.0.0.1:3000/swarm', { waitUntil: 'networkidle' });
+                if (!response || response.status() >= 400) throw new Error('Swarm route failed at ' + viewport.width);
+                if (!(await page.getByText('Demo simulation — not live agent activity').count())) throw new Error('Demo-only disclosure is missing');
+                const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+                if (overflow) throw new Error('Horizontal overflow at ' + viewport.width);
+                if (viewport.width < 768) {
+                  const link = page.locator('nav[aria-label="Primary mobile navigation"] a[href="/swarm"]');
+                  if (!(await link.isVisible())) throw new Error('Swarm mobile navigation link is missing');
+                  await page.goto('http://127.0.0.1:3000/home', { waitUntil: 'networkidle' });
+                  const trigger = page.getByRole('button', { name: 'Open menu' });
+                  await trigger.click();
+                  const dialog = page.getByRole('dialog', { name: 'NEXUS-AI navigation' });
+                  if (!(await dialog.isVisible())) throw new Error('Mobile drawer did not open');
+                  await page.keyboard.press('Escape');
+                  if (await dialog.count()) throw new Error('Escape did not close the mobile drawer');
+                  if (!(await trigger.evaluate(el => el === document.activeElement))) throw new Error('Focus was not restored to the menu trigger');
+                }
+                await page.close();
+              }
+            } finally {
+              await browser.close();
+            }
+          })().catch(error => { console.error(error); process.exit(1); });
+          NODE
