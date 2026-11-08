@@ -10,8 +10,8 @@ import {
   mockProjects,
   mockTasks,
 } from "@/data/mock";
-import { formatRelativeTime } from "@/lib/utils";
-import Link from "next/link";\nimport { RelativeTime } from "@/components/ui/RelativeTime";
+import Link from "next/link";
+import { RelativeTime } from "@/components/ui/RelativeTime";\nimport { RelativeTime } from "@/components/ui/RelativeTime";
 
 export const metadata = { title: "Dashboard" };
 
