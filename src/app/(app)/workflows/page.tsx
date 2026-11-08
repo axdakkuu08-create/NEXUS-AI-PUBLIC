@@ -54,6 +54,7 @@ export default function WorkflowsPage() {
                 {w.runsTotal} runs
               </span>
               {w.lastRun && (
+                <span>Last <RelativeTime timestamp={w.lastRun} /></span>
               )}
             </div>
             {/* Simple visual step strip */}
