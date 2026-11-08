@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { mockWorkflows } from "@/data/mock";
-import { RelativeTime } from "@/components/ui/RelativeTime";\nimport { RelativeTime } from "@/components/ui/RelativeTime";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 
 export const metadata = { title: "Workflows" };
 
@@ -54,7 +54,6 @@ export default function WorkflowsPage() {
                 {w.runsTotal} runs
               </span>
               {w.lastRun && (
-                <span>Last <RelativeTime timestamp={w.lastRun} /></span>
               )}
             </div>
             {/* Simple visual step strip */}
