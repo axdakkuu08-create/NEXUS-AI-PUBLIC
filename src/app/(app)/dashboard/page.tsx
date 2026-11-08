@@ -11,7 +11,6 @@ import {
   mockTasks,
 } from "@/data/mock";
 import Link from "next/link";
-import { RelativeTime } from "@/components/ui/RelativeTime";
 
 export const metadata = { title: "Dashboard" };
 
