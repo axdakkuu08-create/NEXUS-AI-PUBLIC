@@ -3,8 +3,8 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { mockWorkflows } from "@/data/mock";\nimport { RelativeTime } from "@/components/ui/RelativeTime";
-import { formatRelativeTime } from "@/lib/utils";
+import { mockWorkflows } from "@/data/mock";
+import { RelativeTime } from "@/components/ui/RelativeTime";\nimport { RelativeTime } from "@/components/ui/RelativeTime";
 
 export const metadata = { title: "Workflows" };
 
