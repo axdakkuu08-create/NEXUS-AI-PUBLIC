@@ -11,7 +11,7 @@ import {
   mockTasks,
 } from "@/data/mock";
 import Link from "next/link";
-import { RelativeTime } from "@/components/ui/RelativeTime";\nimport { RelativeTime } from "@/components/ui/RelativeTime";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 
 export const metadata = { title: "Dashboard" };
 
@@ -238,7 +238,6 @@ export default function DashboardPage() {
                     </p>
                     <p className="text-[11px] text-muted">{item.description}</p>
                     <p className="mt-0.5 text-[10px] text-muted/70">
-                      <RelativeTime timestamp={item.timestamp} />
                     </p>
                   </div>
                 </li>
