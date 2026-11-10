@@ -99,26 +99,34 @@ jobs:
                   await trigger.click();
                   const dialog = page.getByRole('dialog', { name: 'NEXUS-AI navigation' });
                   if (!(await dialog.isVisible())) throw new Error('Mobile drawer did not open');
+                  if (await trigger.getAttribute('aria-expanded') !== 'true') throw new Error('Menu trigger did not announce expanded state');
+                  if (await trigger.getAttribute('aria-controls') !== 'mobile-navigation-drawer') throw new Error('Menu trigger is not associated with the drawer');
                   const close = page.getByRole('button', { name: 'Close menu' });
                   if (!(await close.evaluate(el => el === document.activeElement))) throw new Error('Initial focus was not moved into the drawer');
-                  await page.keyboard.press('Shift+Tab');
+
                   const last = dialog.locator('a[href="/settings"]');
-                  if (!(await last.evaluate(el => el === document.activeElement))) throw new Error('Shift+Tab did not wrap to the last drawer link');
+                  await page.keyboard.press('Shift+Tab');
+                  if (!(await last.evaluate(el => el === document.activeElement))) throw new Error('Shift+Tab did not wrap from first to last control');
                   await page.keyboard.press('Tab');
-                  if (!(await close.evaluate(el => el === document.activeElement))) throw new Error('Tab did not wrap to the first drawer control');
+                  if (!(await close.evaluate(el => el === document.activeElement))) throw new Error('Tab did not wrap from last to first control');
+
+                  await last.focus();
                   await page.keyboard.press('Tab');
+                  if (!(await close.evaluate(el => el === document.activeElement))) throw new Error('Forward Tab did not wrap from last to first control');
+                  await close.focus();
+                  await page.keyboard.press('Shift+Tab');
+                  if (!(await last.evaluate(el => el === document.activeElement))) throw new Error('Reverse Tab did not wrap from first to last control');
+
+                  await page.evaluate(() => {
+                    document.body.tabIndex = -1;
+                    document.body.focus();
+                  });
                   await page.keyboard.press('Tab');
-                  await page.keyboard.press('Tab');
-                  await page.keyboard.press('Tab');
-                  await page.keyboard.press('Tab');
-                  await page.keyboard.press('Tab');
-                  await page.keyboard.press('Tab');
-                  await page.keyboard.press('Tab');
-                  await page.keyboard.press('Tab');
-                  const activeInside = await dialog.evaluate(el => el.contains(document.activeElement));
-                  if (!activeInside) throw new Error('Tab sequence escaped the mobile drawer');
+                  if (!(await close.evaluate(el => el === document.activeElement))) throw new Error('Focus outside the drawer was not redirected inside');
+
                   await page.keyboard.press('Escape');
                   if (await dialog.count()) throw new Error('Escape did not close the mobile drawer');
+                  if (await trigger.getAttribute('aria-expanded') !== 'false') throw new Error('Menu trigger did not announce collapsed state');
                   if (!(await trigger.evaluate(el => el === document.activeElement))) throw new Error('Focus was not restored to the menu trigger');
                 }
                 await page.close();
