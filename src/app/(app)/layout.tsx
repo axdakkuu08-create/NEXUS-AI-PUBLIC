@@ -113,10 +113,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             aria-label="Close navigation drawer"
+            aria-hidden="true"
+            tabIndex={-1}
             className="absolute inset-0 h-full w-full bg-black/50"
             onClick={() => setDrawerOpen(false)}
           />
           <div
+            id="mobile-navigation-drawer"
             ref={drawerRef}
             role="dialog"
             aria-modal="true"
@@ -180,7 +183,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1" inert={drawerOpen} aria-hidden={drawerOpen}>
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
-          <AppHeader title={title} onMenuClick={() => setDrawerOpen(true)} />
+          <AppHeader title={title} menuOpen={drawerOpen} onMenuClick={() => setDrawerOpen(true)} />
           <main className="flex-1 overflow-x-hidden overflow-y-auto pb-16 md:pb-0">{children}</main>
           <MobileNavigation />
         </div>
