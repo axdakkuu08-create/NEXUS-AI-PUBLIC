@@ -26,11 +26,18 @@ const STATE_COLORS: Record<SwarmAgentState, string> = {
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 const lerp = (a: number, b: number, amount: number) => a + (b - a) * amount;
-const randomIn = (min: number, max: number) => min + Math.random() * (max - min);
+
+export interface SwarmEngineRuntime {
+  now: () => number;
+  random: () => number;
+  requestAnimationFrame: (callback: FrameRequestCallback) => number;
+  cancelAnimationFrame: (id: number) => void;
+}
 
 export class SwarmEngine {
   private cursors: SwarmCursor[] = [];
   private config: SwarmEngineConfig;
+  private runtime: SwarmEngineRuntime;
   private frame = 0;
   private lastTs = 0;
   private rafId: number | null = null;
@@ -38,7 +45,10 @@ export class SwarmEngine {
   private frameListeners = new Set<() => void>();
   private running = false;
 
-  constructor(config: Partial<SwarmEngineConfig> = {}) {
+  constructor(
+    config: Partial<SwarmEngineConfig> = {},
+    runtime: Partial<SwarmEngineRuntime> = {},
+  ) {
     this.config = {
       agentCount: 5,
       width: 800,
@@ -47,22 +57,33 @@ export class SwarmEngine {
       simulation: true,
       ...config,
     };
+    this.runtime = {
+      now: () => performance.now(),
+      random: () => Math.random(),
+      requestAnimationFrame: (callback) => requestAnimationFrame(callback),
+      cancelAnimationFrame: (id) => cancelAnimationFrame(id),
+      ...runtime,
+    };
     this.seed();
+  }
+
+  private randomIn(min: number, max: number) {
+    return min + this.runtime.random() * (max - min);
   }
 
   private seed() {
     const identities = DEFAULT_IDENTITIES.slice(0, this.config.agentCount);
     this.cursors = identities.map((identity, index) => {
-      const x = randomIn(0.15, 0.85);
-      const y = randomIn(0.2, 0.8);
+      const x = this.randomIn(0.15, 0.85);
+      const y = this.randomIn(0.2, 0.8);
       return {
         id: identity.id,
         identity,
         state: (["idle", "working", "waiting"] as SwarmAgentState[])[index % 3],
         x, y, targetX: x, targetY: y, vx: 0, vy: 0,
-        phase: Math.random() * Math.PI * 2,
+        phase: this.runtime.random() * Math.PI * 2,
         taskLabel: undefined,
-        stateChangedAt: performance.now(),
+        stateChangedAt: this.runtime.now(),
       };
     });
   }
@@ -70,7 +91,7 @@ export class SwarmEngine {
   getSnapshot(): SwarmEngineSnapshot {
     return {
       cursors: this.cursors.map((cursor) => ({ ...cursor })),
-      timestamp: performance.now(),
+      timestamp: this.runtime.now(),
       frame: this.frame,
     };
   }
@@ -120,10 +141,10 @@ export class SwarmEngine {
     if (!cursor) return;
     cursor.state = state;
     cursor.taskLabel = taskLabel;
-    cursor.stateChangedAt = performance.now();
+    cursor.stateChangedAt = this.runtime.now();
     if (state === "working" && !this.config.reducedMotion) {
-      cursor.targetX = randomIn(0.12, 0.88);
-      cursor.targetY = randomIn(0.15, 0.85);
+      cursor.targetX = this.randomIn(0.12, 0.88);
+      cursor.targetY = this.randomIn(0.15, 0.85);
     }
     this.emitState();
     this.emitFrame();
@@ -131,25 +152,25 @@ export class SwarmEngine {
 
   private simulate(): boolean {
     if (!this.config.simulation || this.config.reducedMotion) return false;
-    const now = performance.now();
+    const now = this.runtime.now();
     let changed = false;
     for (const cursor of this.cursors) {
-      if (cursor.state === "working" && Math.random() < 0.008) {
-        cursor.targetX = randomIn(0.1, 0.9);
-        cursor.targetY = randomIn(0.15, 0.85);
+      if (cursor.state === "working" && this.runtime.random() < 0.008) {
+        cursor.targetX = this.randomIn(0.1, 0.9);
+        cursor.targetY = this.randomIn(0.15, 0.85);
       }
-      if (now - cursor.stateChangedAt > randomIn(4000, 9000)) {
+      if (now - cursor.stateChangedAt > this.randomIn(4000, 9000)) {
         const states: SwarmAgentState[] = ["idle", "working", "waiting", "completed", "failed"];
-        const next = states[Math.floor(Math.random() * states.length)];
+        const next = states[Math.floor(this.runtime.random() * states.length)];
         cursor.state = next;
         cursor.stateChangedAt = now;
         cursor.taskLabel =
           next === "working"
-            ? ["Analyze", "Compile", "Search", "Review"][Math.floor(Math.random() * 4)]
+            ? ["Analyze", "Compile", "Search", "Review"][Math.floor(this.runtime.random() * 4)]
             : next === "waiting" ? "Awaiting approval" : undefined;
         if (next === "working") {
-          cursor.targetX = randomIn(0.1, 0.9);
-          cursor.targetY = randomIn(0.15, 0.85);
+          cursor.targetX = this.randomIn(0.1, 0.9);
+          cursor.targetY = this.randomIn(0.15, 0.85);
         }
         changed = true;
       }
@@ -182,7 +203,7 @@ export class SwarmEngine {
     this.frame += 1;
     if (this.step(dt)) this.emitState();
     this.emitFrame();
-    this.rafId = requestAnimationFrame(this.loop);
+    this.rafId = this.runtime.requestAnimationFrame(this.loop);
   };
 
   start() {
@@ -192,13 +213,13 @@ export class SwarmEngine {
     }
     this.running = true;
     this.lastTs = 0;
-    this.rafId = requestAnimationFrame(this.loop);
+    this.rafId = this.runtime.requestAnimationFrame(this.loop);
   }
 
   stop() {
     this.running = false;
     if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
+      this.runtime.cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
   }
