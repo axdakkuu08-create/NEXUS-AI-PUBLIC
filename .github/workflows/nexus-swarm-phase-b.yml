@@ -85,12 +85,11 @@ jobs:
                 if (!(await page.getByText('Demo simulation — not live agent activity').count())) throw new Error('Demo-only disclosure is missing');
                 const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
                 if (overflow) throw new Error('Horizontal overflow at ' + viewport.width);
-                const pause = page.getByRole('button', { name: 'Pause' });
-                await pause.click();
-                if (await pause.getAttribute('aria-pressed') !== 'true') throw new Error('Pause control did not enter the paused state');
-                const resume = page.getByRole('button', { name: 'Resume' });
-                await resume.click();
-                if (await page.getByRole('button', { name: 'Pause' }).getAttribute('aria-pressed') !== 'false') throw new Error('Resume control did not clear the paused state');
+                const pauseControl = page.locator('button[aria-pressed]');
+                await pauseControl.click();
+                if (await pauseControl.getAttribute('aria-pressed') !== 'true') throw new Error('Pause control did not enter the paused state');
+                await page.getByRole('button', { name: 'Resume' }).click();
+                if (await pauseControl.getAttribute('aria-pressed') !== 'false') throw new Error('Resume control did not clear the paused state');
 
                 if (viewport.width < 768) {
                   const link = page.locator('nav[aria-label="Primary mobile navigation"] a[href="/swarm"]');
