@@ -8,10 +8,12 @@ import Link from "next/link";
 export function AppHeader({
   title,
   onMenuClick,
+  menuOpen = false,
   className,
 }: {
   title?: string;
   onMenuClick?: () => void;
+  menuOpen?: boolean;
   className?: string;
 }) {
   return (
@@ -26,6 +28,8 @@ export function AppHeader({
         onClick={onMenuClick}
         className="md:hidden flex h-10 w-10 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
         aria-label="Open menu"
+        aria-controls="mobile-navigation-drawer"
+        aria-expanded={menuOpen}
       >
         <Menu className="h-5 w-5" />
       </button>
