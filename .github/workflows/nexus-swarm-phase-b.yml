@@ -47,6 +47,8 @@ jobs:
         run: npm run lint
       - name: TypeScript
         run: npm run typecheck
+      - name: Deterministic Swarm engine tests
+        run: npm run test:swarm
       - name: Next.js production build
         run: npm run build
       - name: Start production server
@@ -83,6 +85,13 @@ jobs:
                 if (!(await page.getByText('Demo simulation — not live agent activity').count())) throw new Error('Demo-only disclosure is missing');
                 const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
                 if (overflow) throw new Error('Horizontal overflow at ' + viewport.width);
+                const pause = page.getByRole('button', { name: 'Pause' });
+                await pause.click();
+                if (await pause.getAttribute('aria-pressed') !== 'true') throw new Error('Pause control did not enter the paused state');
+                const resume = page.getByRole('button', { name: 'Resume' });
+                await resume.click();
+                if (await page.getByRole('button', { name: 'Pause' }).getAttribute('aria-pressed') !== 'false') throw new Error('Resume control did not clear the paused state');
+
                 if (viewport.width < 768) {
                   const link = page.locator('nav[aria-label="Primary mobile navigation"] a[href="/swarm"]');
                   if (!(await link.isVisible())) throw new Error('Swarm mobile navigation link is missing');
@@ -91,11 +100,36 @@ jobs:
                   await trigger.click();
                   const dialog = page.getByRole('dialog', { name: 'NEXUS-AI navigation' });
                   if (!(await dialog.isVisible())) throw new Error('Mobile drawer did not open');
+                  const close = page.getByRole('button', { name: 'Close menu' });
+                  if (!(await close.evaluate(el => el === document.activeElement))) throw new Error('Initial focus was not moved into the drawer');
+                  await page.keyboard.press('Shift+Tab');
+                  const last = dialog.locator('a[href="/settings"]');
+                  if (!(await last.evaluate(el => el === document.activeElement))) throw new Error('Shift+Tab did not wrap to the last drawer link');
+                  await page.keyboard.press('Tab');
+                  if (!(await close.evaluate(el => el === document.activeElement))) throw new Error('Tab did not wrap to the first drawer control');
+                  await page.keyboard.press('Tab');
+                  await page.keyboard.press('Tab');
+                  await page.keyboard.press('Tab');
+                  await page.keyboard.press('Tab');
+                  await page.keyboard.press('Tab');
+                  await page.keyboard.press('Tab');
+                  await page.keyboard.press('Tab');
+                  await page.keyboard.press('Tab');
+                  await page.keyboard.press('Tab');
+                  const activeInside = await dialog.evaluate(el => el.contains(document.activeElement));
+                  if (!activeInside) throw new Error('Tab sequence escaped the mobile drawer');
                   await page.keyboard.press('Escape');
                   if (await dialog.count()) throw new Error('Escape did not close the mobile drawer');
                   if (!(await trigger.evaluate(el => el === document.activeElement))) throw new Error('Focus was not restored to the menu trigger');
                 }
                 await page.close();
+
+                if (viewport.width === 390) {
+                  const reducedPage = await browser.newPage({ viewport, reducedMotion: 'reduce' });
+                  await reducedPage.goto('http://127.0.0.1:3000/swarm', { waitUntil: 'networkidle' });
+                  if (!(await reducedPage.getByText('Reduced motion').isVisible())) throw new Error('Reduced-motion preference was not surfaced in the UI');
+                  await reducedPage.close();
+                }
               }
             } finally {
               await browser.close();
