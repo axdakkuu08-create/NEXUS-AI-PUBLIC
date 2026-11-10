@@ -46,8 +46,8 @@ test("seed and state transitions are deterministic with an injected runtime", ()
   assert.equal(engine.getSnapshot().cursors[0]?.state, "idle");
 
   engine.start();
-  harness.setNow(9_000);
-  harness.flush(9_000);
+  harness.setNow(10_000);
+  harness.flush(10_000);
 
   assert.equal(engine.getSnapshot().cursors[0]?.state, "failed");
   engine.destroy();
