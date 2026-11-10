@@ -77,21 +77,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
 
       if (event.key !== "Tab") return;
-      const focusable = drawerRef.current?.querySelectorAll<HTMLElement>(
+      const drawer = drawerRef.current;
+      const focusable = drawer?.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
       );
       if (!focusable?.length) {
         event.preventDefault();
-        drawerRef.current?.focus();
+        drawer?.focus();
         return;
       }
 
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      const activeElement = document.activeElement;
+      if (!drawer?.contains(activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && activeElement === first) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (!event.shiftKey && activeElement === last) {
         event.preventDefault();
         first.focus();
       }
