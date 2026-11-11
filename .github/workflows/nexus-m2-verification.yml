@@ -1,0 +1,67 @@
+name: NEXUS M2 Convex and chat verification
+
+on:
+  push:
+    branches:
+      - feat/nexus-m2-convex-chat
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nexus-m2-verify-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Generate and commit reproducible npm lockfile when needed
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "ci: sync reproducible lockfile for M2 backend"
+            git push
+          fi
+      - name: Require lockfile consistency
+        run: |
+          test -s package-lock.json
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+            git diff --exit-code -- package-lock.json
+          fi
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Generate Convex types and validate backend schema
+        env:
+          CONVEX_AGENT_MODE: anonymous
+        run: npx convex dev --once --typecheck enable
+      - name: Convex ownership and message-history tests
+        run: npm run test:backend
+      - name: Swarm regression tests
+        run: npm run test:swarm
+      - name: ESLint
+        run: npm run lint
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Strict Convex TypeScript
+        run: npx tsc --noEmit -p convex/tsconfig.json
+      - name: Next.js production build
+        run: npm run build
