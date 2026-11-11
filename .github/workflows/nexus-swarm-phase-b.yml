@@ -42,7 +42,7 @@ jobs:
           test ! -f scripts/prepare-vercel-preview.sh
           echo "Swarm and NEXUS frontend are ordinary checked-in application source."
       - name: Install dependencies
-        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
+        run: npm ci --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
       - name: ESLint
         run: npm run lint
       - name: TypeScript
