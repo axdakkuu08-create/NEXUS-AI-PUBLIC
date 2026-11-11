@@ -233,3 +233,33 @@ test("preferences updates remain single-row and duplicate legacy rows fail close
   );
   expect(preservedRows).toHaveLength(2);
 });
+
+
+test("messages persist per conversation and are isolated by owner", async () => {
+  const t = convexTest(schema, modules);
+  const alice = t.withIdentity(aliceIdentity);
+  const bob = t.withIdentity(bobIdentity);
+
+  const conversationId = await alice.mutation(api.conversations.create, {
+    title: "Persistent conversation",
+  });
+  await alice.mutation(api.messages.send, {
+    conversationId,
+    content: "Persist this message",
+  });
+
+  const aliceMessages = await alice.query(api.messages.list, { conversationId });
+  expect(aliceMessages).toHaveLength(1);
+  expect(aliceMessages[0].content).toBe("Persist this message");
+  expect(aliceMessages[0].role).toBe("user");
+
+  await expect(
+    bob.query(api.messages.list, { conversationId }),
+  ).rejects.toThrow("Conversation not found.");
+  await expect(
+    bob.mutation(api.messages.send, {
+      conversationId,
+      content: "Cross-owner write",
+    }),
+  ).rejects.toThrow("Conversation not found.");
+});
