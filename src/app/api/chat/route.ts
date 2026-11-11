@@ -1,8 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export async function POST(request: Request) {
