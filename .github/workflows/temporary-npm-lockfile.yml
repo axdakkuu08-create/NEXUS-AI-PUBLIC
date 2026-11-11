@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: temporary-npm-lockfile-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   generate-lockfile:
