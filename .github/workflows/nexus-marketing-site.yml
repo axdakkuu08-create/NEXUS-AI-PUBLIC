@@ -1,0 +1,39 @@
+name: NEXUS-AI marketing website
+
+on:
+  push:
+    branches:
+      - feat/nexus-ai-marketing-site
+    paths:
+      - "website/**"
+      - ".github/workflows/nexus-marketing-site.yml"
+  pull_request:
+    paths:
+      - "website/**"
+      - ".github/workflows/nexus-marketing-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-marketing-site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build static website
+        run: npm run build
+      - name: Verify generated entry point
+        run: test -s dist/index.html
