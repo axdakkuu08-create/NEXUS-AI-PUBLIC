@@ -12,7 +12,6 @@ import {
   Sparkles,
   Workflow,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 
 const modules = [
   {
@@ -88,18 +87,20 @@ export default function HomePage() {
                 connected workspace. Core integrations are being brought online.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/chat">
-                  <Button>
-                    <MessageSquare className="h-4 w-4" />
-                    Open chat
-                    <ArrowUpRight className="h-4 w-4" />
-                  </Button>
+                <Link
+                  href="/chat"
+                  className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-5 text-sm font-semibold text-[#050807] transition-colors hover:bg-[var(--accent-hover)]"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Open chat
+                  <ArrowUpRight className="h-4 w-4" />
                 </Link>
-                <Link href="/projects">
-                  <Button variant="secondary">
-                    <FolderGit2 className="h-4 w-4" />
-                    View projects
-                  </Button>
+                <Link
+                  href="/projects"
+                  className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-5 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--accent)]/45 hover:bg-[var(--bg-hover)]"
+                >
+                  <FolderGit2 className="h-4 w-4" />
+                  View projects
                 </Link>
               </div>
             </div>
