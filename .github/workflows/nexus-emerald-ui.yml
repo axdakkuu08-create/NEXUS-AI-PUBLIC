@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/nexus-emerald-workspace-ui-main
+      - main
   pull_request:
     branches:
       - main
