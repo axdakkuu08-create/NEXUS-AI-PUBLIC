@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { SignInButton } from "@clerk/nextjs";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { MessageSquarePlus } from "lucide-react";
@@ -40,24 +40,20 @@ function ConnectedChatInterface() {
   const conversations = useQuery(api.conversations.list, isAuthenticated ? {} : "skip");
   const createConversation = useMutation(api.conversations.create);
   const addMessage = useMutation(api.messages.add);
-  const [selectedConversationId, setSelectedConversationId] =
-    useState<Id<"conversations"> | null | undefined>(undefined);
+  const [selectedConversationId, setSelectedConversationId] = useState<Id<"conversations"> | null>(null);
+  const [conversationChoiceMade, setConversationChoiceMade] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    if (selectedConversationId === undefined && conversations !== undefined) {
-      setSelectedConversationId(conversations[0]?._id ?? null);
-    }
-  }, [conversations, selectedConversationId]);
+  const activeConversationId = conversationChoiceMade
+    ? selectedConversationId
+    : conversations?.[0]?._id ?? null;
 
   const storedMessages = useQuery(
     api.messages.list,
-    isAuthenticated && selectedConversationId
-      ? { conversationId: selectedConversationId }
-      : "skip",
+    isAuthenticated && activeConversationId ? { conversationId: activeConversationId } : "skip",
   );
 
   const handleSend = async (content: string) => {
@@ -69,10 +65,11 @@ function ConnectedChatInterface() {
     setNotice(null);
 
     try {
-      let conversationId = selectedConversationId;
+      let conversationId = activeConversationId;
       if (!conversationId) {
         conversationId = await createConversation({ title: content.slice(0, 80) });
         setSelectedConversationId(conversationId);
+        setConversationChoiceMade(true);
       }
 
       const history = (storedMessages ?? []).slice(-18).map((message) => ({
@@ -129,10 +126,10 @@ function ConnectedChatInterface() {
       </div>
     );
   }
-  if (conversations === undefined || selectedConversationId === undefined) {
+  if (conversations === undefined) {
     return <div className="p-6 text-center text-sm text-[var(--text-secondary)]">Loading your conversations…</div>;
   }
-  if (selectedConversationId && storedMessages === undefined) {
+  if (activeConversationId && storedMessages === undefined) {
     return <div className="p-6 text-center text-sm text-[var(--text-secondary)]">Loading conversation history…</div>;
   }
 
@@ -150,10 +147,11 @@ function ConnectedChatInterface() {
         <select
           id="conversation-history"
           aria-label="Conversation history"
-          value={selectedConversationId ?? ""}
-          onChange={(event) =>
-            setSelectedConversationId(event.target.value ? (event.target.value as Id<"conversations">) : null)
-          }
+          value={activeConversationId ?? ""}
+          onChange={(event) => {
+            setConversationChoiceMade(true);
+            setSelectedConversationId(event.target.value ? (event.target.value as Id<"conversations">) : null);
+          }}
           className="min-w-0 max-w-full flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-xs text-[var(--text-primary)]"
           disabled={pending}
         >
@@ -164,7 +162,10 @@ function ConnectedChatInterface() {
         </select>
         <button
           type="button"
-          onClick={() => setSelectedConversationId(null)}
+          onClick={() => {
+            setConversationChoiceMade(true);
+            setSelectedConversationId(null);
+          }}
           disabled={pending}
           className="rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] disabled:opacity-50"
         >
