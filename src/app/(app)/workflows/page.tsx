@@ -1,7 +1,6 @@
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { mockWorkflows } from "@/data/mock";
 import { RelativeTime } from "@/components/ui/RelativeTime";
@@ -21,13 +20,14 @@ export default function WorkflowsPage() {
       <Header
         title="Workflow Center"
         description="Visual workflow management"
-        actions={
-          <Button size="sm">
-            <Icon name="plus" size={16} />
-            New workflow
-          </Button>
-        }
       />
+
+      <div className="mx-4 mb-4 rounded-xl border border-amber-400/25 bg-amber-400/5 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="warning">Preview only</Badge>
+          <p className="text-xs text-muted">These workflows are sample records. Creating, editing and running workflows are not connected yet.</p>
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {mockWorkflows.map((w) => (
@@ -67,14 +67,9 @@ export default function WorkflowsPage() {
                 />
               ))}
             </div>
-            <div className="mt-4 flex gap-2">
-              <Button size="sm" variant="secondary" className="flex-1">
-                Open editor
-              </Button>
-              <Button size="sm" variant="ghost" disabled={w.status === "draft"}>
-                Run
-              </Button>
-            </div>
+            <p className="mt-4 border-t border-white/6 pt-3 text-[11px] text-muted">
+              Workflow controls will be enabled after backend and execution integration.
+            </p>
           </Card>
         ))}
       </div>
