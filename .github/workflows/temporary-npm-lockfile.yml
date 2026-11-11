@@ -1,14 +1,22 @@
 name: Temporary npm lockfile generation
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - feat/nexus-swarm-visualization
+    paths:
+      - .github/workflows/temporary-npm-lockfile.yml
 
 permissions:
   contents: read
 
+concurrency:
+  group: temporary-npm-lockfile-{github.ref}
+  cancel-in-progress: false
+
 jobs:
   generate-lockfile:
-    if: github.ref == 'refs/heads/feat/nexus-swarm-visualization'
+    if: github.ref == 'refs/heads/feat/nexus-swarm-visualization' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
