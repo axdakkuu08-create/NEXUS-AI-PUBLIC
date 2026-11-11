@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/nexus-m2-convex-chat
+      - main
   pull_request:
     branches:
       - main
@@ -29,7 +30,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Generate and commit reproducible npm lockfile when needed
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref_name == 'feat/nexus-m2-convex-chat'
         run: |
           set -euo pipefail
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
