@@ -1,0 +1,51 @@
+name: NEXUS integration M1 gate
+
+on:
+  push:
+    branches:
+      - integration/frontend-backend-reconciliation
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "convex/**"
+      - "package.json"
+      - "vitest.config.ts"
+      - "tsconfig.json"
+      - ".github/workflows/nexus-integration-m1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-integration-m1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Generate Convex types
+        env:
+          CONVEX_AGENT_MODE: anonymous
+        run: npx convex dev --once --typecheck enable
+      - name: Backend ownership and persistence tests
+        run: npm run test:backend
+      - name: Frontend lint and typecheck
+        run: npm run lint && npm run typecheck
+      - name: Swarm regression tests
+        run: npm run test:swarm
+      - name: Next.js production build
+        run: npm run build
