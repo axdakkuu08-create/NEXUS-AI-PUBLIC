@@ -66,6 +66,13 @@ export default function DashboardPage() {
         }
       />
 
+      <div className="mx-4 mb-4 rounded-xl border border-amber-400/25 bg-amber-400/5 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="warning">Sample data</Badge>
+          <p className="text-xs text-muted">Dashboard metrics, projects, tasks, agents and activity below are illustrative preview content, not live account data.</p>
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => (
           <Card key={s.label} padding="md" className="flex items-center gap-3">
