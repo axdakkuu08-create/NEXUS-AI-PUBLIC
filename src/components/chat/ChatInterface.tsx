@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Message } from "@/lib/types";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
@@ -10,8 +10,31 @@ import { MessageSquare } from "lucide-react";
 export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopPendingResponse = () => {
+    if (pendingTimer.current !== null) {
+      clearTimeout(pendingTimer.current);
+      pendingTimer.current = null;
+    }
+    setStreaming(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (pendingTimer.current !== null) {
+        clearTimeout(pendingTimer.current);
+        pendingTimer.current = null;
+      }
+    };
+  }, []);
 
   const handleSend = (text: string) => {
+    if (pendingTimer.current !== null) {
+      clearTimeout(pendingTimer.current);
+      pendingTimer.current = null;
+    }
+
     const userMsg: Message = {
       id: `u-${Date.now()}`,
       role: "user",
@@ -20,9 +43,10 @@ export function ChatInterface() {
     };
     setMessages((m) => [...m, userMsg]);
 
-    // Honest: no backend yet — show a local system note instead of fake AI success
+    // Honest preview: this is a local system note, not an AI-generated response.
     setStreaming(true);
-    setTimeout(() => {
+    pendingTimer.current = setTimeout(() => {
+      pendingTimer.current = null;
       const note: Message = {
         id: `a-${Date.now()}`,
         role: "assistant",
@@ -50,7 +74,7 @@ export function ChatInterface() {
       </div>
       <ChatInput
         onSend={handleSend}
-        onStop={() => setStreaming(false)}
+        onStop={stopPendingResponse}
         streaming={streaming}
       />
     </div>
