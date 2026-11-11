@@ -95,7 +95,7 @@ jobs:
                   const link = page.locator('nav[aria-label="Primary mobile navigation"] a[href="/swarm"]');
                   if (!(await link.isVisible())) throw new Error('Swarm mobile navigation link is missing');
                   await page.goto('http://127.0.0.1:3000/home', { waitUntil: 'networkidle' });
-                  const trigger = page.getByRole('button', { name: 'Open menu' });
+                  const trigger = page.locator('button[aria-label="Open menu"]');
                   await trigger.click();
                   const dialog = page.getByRole('dialog', { name: 'NEXUS-AI navigation' });
                   if (!(await dialog.isVisible())) throw new Error('Mobile drawer did not open');
