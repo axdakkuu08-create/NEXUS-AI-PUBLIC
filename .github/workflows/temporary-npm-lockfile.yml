@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: temporary-npm-lockfile-{github.ref}
+  group: temporary-npm-lockfile-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
