@@ -40,12 +40,14 @@ jobs:
       - name: Commit generated lockfile to integration branch
         if: github.event_name == 'push' && github.ref == 'refs/heads/integration/frontend-backend-reconciliation'
         run: |
-          if ! git diff --quiet -- package-lock.json; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f package-lock.json ]; then
             git add package-lock.json
-            git commit -m "build: add reproducible integration lockfile"
-            git push
+            if ! git diff --cached --quiet -- package-lock.json; then
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git commit -m "build: add reproducible integration lockfile"
+              git push
+            fi
           fi
       - name: Install from lockfile
         run: npm ci --ignore-scripts --no-audit --no-fund
