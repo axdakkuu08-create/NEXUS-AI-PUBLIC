@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { AppHeader } from "@/components/layout/AppHeader";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { mainNav } from "@/components/layout/nav-items";
@@ -46,12 +47,14 @@ const titles: Record<string, string> = {
   "/settings": "Settings",
 };
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+function AuthenticatedAppLayout({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const wasDrawerOpen = useRef(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { isLoaded, isSignedIn } = useAuth();
   const title =
     titles[pathname] ??
     Object.entries(titles).find(([key]) => key !== "/" && pathname.startsWith(key))?.[1] ??
@@ -190,4 +193,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     </div>
   );
+}
+
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  return <AuthenticatedAppLayout>{children}</AuthenticatedAppLayout>;
 }
