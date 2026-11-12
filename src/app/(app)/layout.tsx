@@ -55,6 +55,10 @@ function AuthenticatedAppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { isLoaded, isSignedIn } = useAuth();
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) router.replace("/sign-in");
+  }, [isLoaded, isSignedIn, router]);
+
   const title =
     titles[pathname] ??
     Object.entries(titles).find(([key]) => key !== "/" && pathname.startsWith(key))?.[1] ??
@@ -108,6 +112,10 @@ function AuthenticatedAppLayout({ children }: { children: React.ReactNode }) {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [drawerOpen]);
+
+  if (!isLoaded || !isSignedIn) {
+    return <div className="flex min-h-screen items-center justify-center text-sm text-[var(--text-secondary)]">Checking your secure session…</div>;
+  }
 
   return (
     <div className="ambient-glow flex h-[100dvh] overflow-hidden">
