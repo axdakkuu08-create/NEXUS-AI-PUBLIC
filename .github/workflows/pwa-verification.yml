@@ -1,0 +1,53 @@
+name: NEXUS PWA verification
+
+on:
+  push:
+    branches:
+      - feat/pwa-offline-shell
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-pwa-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
+      - name: ESLint
+        run: npm run lint
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Existing Swarm tests
+        run: npm run test:swarm
+      - name: PWA asset tests
+        run: node --test tests/pwa-assets.test.mjs
+      - name: Production build
+        run: npm run build
+      - name: Start production server
+        run: |
+          (npm run start -- --hostname 127.0.0.1 > /tmp/nexus-pwa-next.log 2>&1 & echo $! > /tmp/nexus-pwa-next.pid)
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/home >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/nexus-pwa-next.log
+          exit 1
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts playwright --registry=https://registry.npmjs.org --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Mobile offline smoke test
+        run: node tests/pwa-offline.smoke.mjs
