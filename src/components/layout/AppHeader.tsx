@@ -3,6 +3,7 @@
 import { cn } from "@/lib/cn";
 import { Menu, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { PWAInstallButton } from "@/components/pwa/PWAInstallButton";
 import Link from "next/link";
 
 export function AppHeader({
@@ -37,6 +38,8 @@ export function AppHeader({
       <div className="flex-1 min-w-0">
         <h1 className="text-base font-semibold truncate">{title ?? "NEXUS-AI"}</h1>
       </div>
+
+      <PWAInstallButton />
 
       <Link href="/chat" className="md:hidden">
         <Button size="icon" variant="primary" aria-label="New chat">
