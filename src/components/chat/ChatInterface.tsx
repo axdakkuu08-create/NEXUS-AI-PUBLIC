@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { api } from "../../../convex/_generated/api";
@@ -15,18 +15,13 @@ export function ChatInterface() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const conversations = useQuery(api.conversations.list, {});
+  const activeConversationId = conversationId ?? conversations?.[0]?._id ?? null;
   const storedMessages = useQuery(
     api.messages.list,
-    conversationId ? { conversationId } : "skip",
+    activeConversationId ? { conversationId: activeConversationId } : "skip",
   );
   const createConversation = useMutation(api.conversations.create);
   const sendMessage = useMutation(api.messages.send);
-
-  useEffect(() => {
-    if (!conversationId && conversations && conversations.length > 0) {
-      setConversationId(conversations[0]._id);
-    }
-  }, [conversationId, conversations]);
 
   const messages: Message[] = (storedMessages ?? []).map((message) => ({
     id: message._id,
@@ -39,7 +34,7 @@ export function ChatInterface() {
     setSending(true);
     setError(null);
     try {
-      let activeConversation = conversationId;
+      let activeConversation = activeConversationId;
       if (!activeConversation) {
         activeConversation = await createConversation({
           title: content.slice(0, 80),
