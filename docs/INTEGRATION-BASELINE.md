@@ -38,3 +38,16 @@ Status: **Integration in progress — M1 NOT accepted**
 - [ ] Evidence (workflow run plus authenticated browser test) is attached to the integration PR.
 
 M1 remains incomplete until every item above is evidenced.
+
+## Frontend auth and message persistence implementation
+
+- Root provider uses Clerk `ClerkProvider` and Convex `ConvexProviderWithClerk`.
+- Workspace routes require a loaded Clerk session; unauthenticated visitors are redirected to `/sign-in`.
+- Sign-in and sign-up routes use Clerk's hosted components.
+- Chat creates or reuses an owner-scoped Convex conversation and reads/writes messages through `api.messages.list` and `api.messages.send`. It no longer fabricates local assistant replies.
+- The backend Clerk issuer remains `https://charmed-goshawk-6691.clerk.accounts.dev`; the frontend publishable key must come from that exact Clerk application. The JWT template consumed by Convex must be named `convex` and use audience `convex`.
+- The prior hard-coded `shocking-salamander-814` URL is removed from runtime service configuration. Supply the actual paired deployment as `NEXT_PUBLIC_CONVEX_URL`; do not guess or silently substitute a deployment.
+- `.env.example` contains placeholders only. No credentials or real deployment URLs are committed.
+- GitHub Actions generates and commits `package-lock.json` on the integration branch before enforcing `npm ci`.
+
+These code paths are implemented but remain **unverified at runtime** until valid Clerk/Convex environment values are supplied and the CI and authenticated browser round-trip pass.
