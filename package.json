@@ -18,7 +18,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "tailwind-merge": "^2.5.4",
-    "convex": "1.48.0"
+    "convex": "1.48.0",
+    "@clerk/nextjs": "^6.36.0"
   },
   "devDependencies": {
     "@edge-runtime/vm": "5.0.0",
