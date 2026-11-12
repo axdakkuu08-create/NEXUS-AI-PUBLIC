@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
 import type { Message } from "@/lib/types";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
@@ -8,50 +11,70 @@ import { EmptyState } from "@/components/states/EmptyState";
 import { MessageSquare } from "lucide-react";
 
 export function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [streaming, setStreaming] = useState(false);
+  const [conversationId, setConversationId] = useState<Id<"conversations"> | null>(null);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const conversations = useQuery(api.conversations.list, {});
+  const storedMessages = useQuery(
+    api.messages.list,
+    conversationId ? { conversationId } : "skip",
+  );
+  const createConversation = useMutation(api.conversations.create);
+  const sendMessage = useMutation(api.messages.send);
 
-  const handleSend = (text: string) => {
-    const userMsg: Message = {
-      id: `u-${Date.now()}`,
-      role: "user",
-      content: text,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages((m) => [...m, userMsg]);
+  useEffect(() => {
+    if (!conversationId && conversations && conversations.length > 0) {
+      setConversationId(conversations[0]._id);
+    }
+  }, [conversationId, conversations]);
 
-    // Honest: no backend yet — show a local system note instead of fake AI success
-    setStreaming(true);
-    setTimeout(() => {
-      const note: Message = {
-        id: `a-${Date.now()}`,
-        role: "assistant",
-        content:
-          "Backend is not connected yet. Conversations will persist after Convex integration (M2). This is a local UI preview only.",
-        createdAt: new Date().toISOString(),
-      };
-      setMessages((m) => [...m, note]);
-      setStreaming(false);
-    }, 600);
+  const messages: Message[] = (storedMessages ?? []).map((message) => ({
+    id: message._id,
+    role: message.role,
+    content: message.content,
+    createdAt: new Date(message.createdAt).toISOString(),
+  }));
+
+  const handleSend = async (content: string) => {
+    setSending(true);
+    setError(null);
+    try {
+      let activeConversation = conversationId;
+      if (!activeConversation) {
+        activeConversation = await createConversation({
+          title: content.slice(0, 80),
+        });
+        setConversationId(activeConversation);
+      }
+      await sendMessage({ conversationId: activeConversation, content });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Message could not be saved.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
-    <div className="flex h-full flex-col min-h-0">
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.length === 0 ? (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        {storedMessages === undefined ? (
+          <p className="text-center text-xs text-[var(--text-tertiary)]">Loading saved conversation…</p>
+        ) : messages.length === 0 ? (
           <EmptyState
             icon={<MessageSquare className="h-6 w-6" />}
             title="Start a conversation"
-            description="Messages will sync with Convex when the backend is connected. Until then, this is a UI preview."
+            description="Your messages are saved to your authenticated Convex account and reload with this conversation."
           />
         ) : (
-          messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
+          messages.map((message) => <MessageBubble key={message.id} message={message} />)
         )}
+        {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
       </div>
       <ChatInput
         onSend={handleSend}
-        onStop={() => setStreaming(false)}
-        streaming={streaming}
+        disabled={sending}
+        streaming={false}
+        placeholder={sending ? "Saving message…" : "Message NEXUS…"}
       />
     </div>
   );
