@@ -80,7 +80,6 @@ try {
   await page.reload();
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
 
-  const cacheName = "nexus-pwa-v2-m2";
   const cacheState = async (url) => page.evaluate(async (target) => {
     const cache = await caches.open("nexus-pwa-v2-m2");
     return (await cache.match(target)) !== undefined;
