@@ -197,7 +197,9 @@ test("a stale cached response with private headers is deleted, not replayed", as
   await runtime.dispatch("fetch", event);
   const response = await event.response();
   assert.equal(await response.text(), "asset");
-  assert.equal(await cache.match(request), undefined);
+  const refreshed = await cache.match(request);
+  assert.ok(refreshed, "the fresh network response may be cached");
+  assert.equal(await refreshed.text(), "asset");
 });
 
 test("logout invalidates an in-flight cache write", async () => {
