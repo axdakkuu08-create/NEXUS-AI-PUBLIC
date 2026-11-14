@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:swarm": "node --experimental-strip-types --test tests/swarm-engine.test.ts"
+    "test:swarm": "node --experimental-strip-types --test tests/swarm-engine.test.ts",
+    "test:pwa": "node --experimental-strip-types --test tests/pwa/cache-policy.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
