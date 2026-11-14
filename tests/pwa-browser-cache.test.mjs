@@ -38,6 +38,11 @@ const server = createServer((request, response) => {
       response.end();
       return;
     }
+    if (url.searchParams.get("status") === "404") {
+      response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      response.end("not found");
+      return;
+    }
     const headers = { "Content-Type": "text/plain; charset=utf-8" };
     const cacheControl = url.searchParams.get("cache-control");
     if (cacheControl) headers["Cache-Control"] = cacheControl;
@@ -107,10 +112,10 @@ try {
   assert.equal(cookieResponse.setCookieVisible, false, "Set-Cookie must be browser-inaccessible to page/service-worker JavaScript");
   assert.equal(await cacheState(origin + cookiePath), false, "server must pair cookie/session-setting responses with no-store");
 
-  const errorPath = "/icons/nexus-192.png?cache-control=no-store";
-  const errorResponse = await fetchFromPage("/missing");
+  const errorPath = "/icons/nexus-192.png?status=404";
+  const errorResponse = await fetchFromPage(errorPath);
   assert.equal(errorResponse.status, 404);
-  assert.equal(await cacheState(origin + errorPath), false);
+  assert.equal(await cacheState(origin + errorPath), false, "error response must not enter Cache Storage");
 
   // Request classes outside the positive allowlist remain network-only even when 2xx.
   const excludedRequests = [
