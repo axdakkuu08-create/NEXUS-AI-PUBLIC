@@ -54,3 +54,5 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Mobile offline smoke test
         run: node tests/pwa-offline.smoke.mjs
+      - name: Real browser Cache Storage exclusion tests
+        run: node tests/pwa-browser-cache.test.mjs
