@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/pwa-offline-shell
+      - security/m2-pwa-remediation
   workflow_dispatch:
 
 permissions:
@@ -32,6 +33,8 @@ jobs:
         run: npm run typecheck
       - name: Existing Swarm tests
         run: npm run test:swarm
+      - name: M2 service-worker cache boundary tests
+        run: npm run test:pwa
       - name: PWA asset tests
         run: node --test tests/pwa-assets.test.mjs
       - name: Production build
