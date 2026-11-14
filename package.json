@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:swarm": "node --experimental-strip-types --test tests/swarm-engine.test.ts",
-    "test:pwa": "node --experimental-strip-types --test tests/pwa/cache-policy.test.ts"
+    "test:pwa": "node --test tests/pwa/cache-policy.test.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
