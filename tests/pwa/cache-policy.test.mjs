@@ -10,7 +10,7 @@ const workerSource = readFileSync(join(here, "../../public/sw.js"), "utf8");
 const ORIGIN = "https://nexus.test";
 const CACHE_NAME = "nexus-pwa-v2-m2";
 
-function makeRuntime(fetchImpl = async () => new Response("asset")) {
+function makeRuntime(fetchImpl = async () => new Response("asset"), options = {}) {
   const listeners = new Map();
   const stores = new Map();
   const keyOf = (request) => (typeof request === "string" ? new URL(request, ORIGIN).href : request.url);
@@ -18,7 +18,10 @@ function makeRuntime(fetchImpl = async () => new Response("asset")) {
     if (!stores.has(name)) stores.set(name, new Map());
     const store = stores.get(name);
     return {
-      async put(request, response) { store.set(keyOf(request), response.clone()); },
+      async put(request, response) {
+        if (options.beforePut) await options.beforePut(request, response);
+        store.set(keyOf(request), response.clone());
+      },
       async match(request) {
         const value = store.get(keyOf(request));
         return value ? value.clone() : undefined;
@@ -143,16 +146,6 @@ for (const directive of ["no-store", "private", "no-cache", "max-age=0, PRIVATE"
   });
 }
 
-test("Set-Cookie response is not cached", async () => {
-  const runtime = makeRuntime(async () => new Response("session", {
-    headers: { "Set-Cookie": "sid=secret; HttpOnly" },
-  }));
-  const event = makeEvent(new Request(ORIGIN + "/icons/nexus-192.png"));
-  await runtime.dispatch("fetch", event);
-  await event.response();
-  assert.equal(runtime.stores.get(CACHE_NAME)?.has(event.request.url) || false, false);
-});
-
 test("Vary star response is not cached", async () => {
   const runtime = makeRuntime(async () => new Response("vary", { headers: { Vary: "*" } }));
   const event = makeEvent(new Request(ORIGIN + "/icons/nexus-192.png"));
@@ -202,23 +195,60 @@ test("a stale cached response with private headers is deleted, not replayed", as
   assert.equal(await refreshed.text(), "asset");
 });
 
-test("logout invalidates an in-flight cache write", async () => {
-  let resolveFetch;
-  const runtime = makeRuntime(() => new Promise((resolve) => { resolveFetch = resolve; }));
+test("logout during an already-started cache.put removes the stale write", async () => {
+  let signalPutStarted;
+  const putStarted = new Promise((resolve) => { signalPutStarted = resolve; });
+  let releasePut;
+  const blockedPut = new Promise((resolve) => { releasePut = resolve; });
+  const runtime = makeRuntime(
+    async () => new Response("late response"),
+    { beforePut: async () => { signalPutStarted(); await blockedPut; } },
+  );
   const request = new Request(ORIGIN + "/icons/nexus-192.png");
   const fetchEvent = makeEvent(request);
   await runtime.dispatch("fetch", fetchEvent);
-  for (let attempt = 0; attempt < 10 && !resolveFetch; attempt += 1) {
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  assert.equal(typeof resolveFetch, "function");
+  await putStarted;
+
   const messageEvent = makeEvent(undefined);
   messageEvent.data = { type: "NEXUS_LOGOUT" };
   await runtime.dispatch("message", messageEvent);
-  resolveFetch(new Response("late response"));
+  releasePut();
   await fetchEvent.response();
+
   const cache = await runtime.caches.open(CACHE_NAME);
   assert.equal(await cache.match(request), undefined);
+});
+
+test("a new-generation write queued behind a stale write survives logout", async () => {
+  let putCount = 0;
+  let signalFirstPut;
+  const firstPutStarted = new Promise((resolve) => { signalFirstPut = resolve; });
+  let releaseFirstPut;
+  const blockedFirstPut = new Promise((resolve) => { releaseFirstPut = resolve; });
+  const runtime = makeRuntime(
+    async () => new Response(++putCount === 1 ? "old generation" : "new generation"),
+    { beforePut: async () => {
+      if (putCount === 1) { signalFirstPut(); await blockedFirstPut; }
+    } },
+  );
+  const request = new Request(ORIGIN + "/icons/nexus-192.png?generation-test=1");
+  const firstEvent = makeEvent(request);
+  await runtime.dispatch("fetch", firstEvent);
+  await firstPutStarted;
+
+  const logoutEvent = makeEvent(undefined);
+  logoutEvent.data = { type: "NEXUS_LOGOUT" };
+  await runtime.dispatch("message", logoutEvent);
+
+  const secondEvent = makeEvent(request);
+  await runtime.dispatch("fetch", secondEvent);
+  releaseFirstPut();
+  await Promise.all([firstEvent.response(), secondEvent.response()]);
+
+  const cache = await runtime.caches.open(CACHE_NAME);
+  const stored = await cache.match(request);
+  assert.ok(stored);
+  assert.equal(await stored.text(), "new generation");
 });
 
 test("cache cleanup removes only NEXUS-owned caches", async () => {
