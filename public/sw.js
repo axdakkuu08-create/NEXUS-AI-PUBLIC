@@ -9,6 +9,7 @@ const SHELL_ASSETS = [
 ];
 
 let cacheEpoch = 0;
+const pendingWrites = new Map();
 
 function isNextRouteData(request, url) {
   return (
@@ -70,8 +71,12 @@ function isCacheableResponse(request, response) {
   }
 
   const headers = response.headers;
-  if (!headers || headers.has("Set-Cookie")) return false;
+  if (!headers) return false;
 
+  // Set-Cookie is a forbidden response header and is not exposed to service-worker
+  // JavaScript. Do not attempt to detect it here. Session-establishing/dynamic
+  // endpoints are excluded by the request allowlist; servers must send no-store
+  // on any response that sets cookies or carries session-specific state.
   const cacheControl = (headers.get("Cache-Control") || "")
     .split(",")
     .map((directive) => directive.trim().split("=")[0].toLowerCase());
@@ -83,6 +88,25 @@ function isCacheableResponse(request, response) {
   if (vary && vary.split(",").some((value) => value.trim() === "*")) return false;
 
   return true;
+}
+
+async function putForGeneration(cache, request, response, requestEpoch) {
+  const key = request.url;
+  const previous = pendingWrites.get(key) || Promise.resolve();
+  const current = previous.catch(() => undefined).then(async () => {
+    if (requestEpoch !== cacheEpoch) return;
+    await cache.put(request, response.clone());
+    // A write already in progress cannot be cancelled. Remove its result if
+    // logout/account invalidation advanced the generation while put() was pending.
+    if (requestEpoch !== cacheEpoch) await cache.delete(request);
+  });
+  pendingWrites.set(key, current);
+
+  try {
+    await current;
+  } finally {
+    if (pendingWrites.get(key) === current) pendingWrites.delete(key);
+  }
 }
 
 self.addEventListener("install", (event) => {
@@ -178,7 +202,7 @@ self.addEventListener("fetch", (event) => {
           isCacheableResponse(request, response)
         ) {
           try {
-            await cache.put(request, response.clone());
+            await putForGeneration(cache, request, response, requestEpoch);
           } catch {
             // Cache quota/storage failures never change the network response.
           }
