@@ -37,5 +37,5 @@ test("service worker and offline fallback are present", async () => {
   assert.match(worker, /addEventListener\("fetch"/);
   assert.match(worker, /cache\.match/);
   assert.match(fallback, /You're offline/);
-  assert.match(fallback, /AI responses/);
+  assert.match(fallback, /Previously visited workspace pages/);\n  assert.match(fallback, /private route responses/);
 });
