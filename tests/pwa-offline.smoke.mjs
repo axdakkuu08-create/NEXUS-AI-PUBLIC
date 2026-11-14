@@ -27,17 +27,25 @@ try {
   assert.equal(
     await page.getByText("NEXUS-AI Command Center").count(),
     1,
-    "the mobile home workspace should render",
+    "the mobile home workspace should render while online",
   );
 
   await context.setOffline(true);
-  const cachedResponse = await page.goto(baseUrl + "/home", { waitUntil: "domcontentloaded" });
-  assert.ok(cachedResponse && cachedResponse.status() === 200, "visited home page should load from cache");
+  const offlineResponse = await page.goto(baseUrl + "/home", { waitUntil: "domcontentloaded" });
+  assert.ok(offlineResponse && offlineResponse.status() === 200, "offline navigation should receive the generic fallback");
+  assert.equal(await page.getByRole("heading", { name: "You're offline" }).count(), 1);
   assert.equal(
     await page.getByText("NEXUS-AI Command Center").count(),
-    1,
-    "cached home page should remain readable offline",
+    0,
+    "a previously visited workspace page must not be replayed offline",
   );
+
+  const publicManifest = await page.evaluate(async () => {
+    const result = await fetch("/manifest.webmanifest");
+    return { ok: result.ok, manifest: await result.json() };
+  });
+  assert.equal(publicManifest.ok, true, "the explicitly approved public manifest should remain available offline");
+  assert.equal(publicManifest.manifest.name, "NEXUS-AI");
 
   const fallbackResponse = await page.goto(baseUrl + "/pwa-offline-test-unvisited", {
     waitUntil: "domcontentloaded",

@@ -27,11 +27,28 @@ export function PWARegistration() {
   );
 
   useEffect(() => {
-    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
-      void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
-        // The web app remains usable when service-worker registration is unavailable.
-      });
+    if (!("serviceWorker" in navigator) || process.env.NODE_ENV !== "production") return;
+
+    let channel: BroadcastChannel | undefined;
+    const forwardLogout = (event: MessageEvent<{ type?: string }>) => {
+      if (event.data?.type === "NEXUS_LOGOUT" || event.data?.type === "NEXUS_CLEAR_CACHES") {
+        navigator.serviceWorker.controller?.postMessage(event.data);
+      }
+    };
+
+    if (typeof BroadcastChannel !== "undefined") {
+      channel = new BroadcastChannel("nexus-session-events");
+      channel.addEventListener("message", forwardLogout);
     }
+
+    void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
+      // The web app remains usable when service-worker registration is unavailable.
+    });
+
+    return () => {
+      channel?.removeEventListener("message", forwardLogout);
+      channel?.close();
+    };
   }, []);
 
   if (isOnline) return null;
@@ -42,7 +59,7 @@ export function PWARegistration() {
       aria-live="polite"
     >
       <p className="rounded-full border border-[var(--warning)]/40 bg-[var(--bg-elevated)] px-3 py-2 text-xs font-medium text-[var(--warning)] shadow-lg">
-        Offline · saved pages only
+        Offline · public shell only
       </p>
     </div>
   );
