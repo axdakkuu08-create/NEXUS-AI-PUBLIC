@@ -94,7 +94,9 @@ test("navigation is network-only and offline fallback is the generic shell", asy
     throw new Error("offline");
   });
   await install(runtime);
-  const event = makeEvent(new Request(ORIGIN + "/home", { mode: "navigate" }));
+  const navigationRequest = new Request(ORIGIN + "/home");
+  Object.defineProperty(navigationRequest, "mode", { value: "navigate" });
+  const event = makeEvent(navigationRequest);
   await runtime.dispatch("fetch", event);
   const response = await event.response();
   assert.match(await response.text(), /GENERIC OFFLINE SHELL/);
