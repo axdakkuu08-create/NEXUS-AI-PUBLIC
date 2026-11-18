@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/pwa-offline-shell
+      - security/m2-pwa-remediation
   workflow_dispatch:
 
 permissions:
@@ -32,7 +33,9 @@ jobs:
         run: npm run typecheck
       - name: Existing Swarm tests
         run: npm run test:swarm
-      - name: PWA asset tests
+      - name: M2 service-worker cache boundary and hardening tests
+        run: npm run test:pwa
+      - name: PWA asset and production notification contract tests
         run: node --test tests/pwa-assets.test.mjs
       - name: Production build
         run: npm run build
@@ -51,3 +54,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Mobile offline smoke test
         run: node tests/pwa-offline.smoke.mjs
+      - name: Real browser Cache Storage exclusion tests
+        run: node tests/pwa-browser-cache.test.mjs
+      - name: Test-only two-identity, multi-tab, offline-logout and session-expiry tests
+        run: node tests/pwa-session-lifecycle.test.mjs
