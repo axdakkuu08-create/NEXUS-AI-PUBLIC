@@ -40,3 +40,12 @@ test("service worker and offline fallback are present", async () => {
   assert.match(fallback, /Previously visited workspace pages/);
   assert.match(fallback, /private route responses/);
 });
+
+test("production PWA registration forwards logout and cache-clear broadcasts to the worker", async () => {
+  const registration = await readFile(new URL("src/components/pwa/PWARegistration.tsx", root), "utf8");
+  assert.match(registration, /new BroadcastChannel\("nexus-session-events"\)/);
+  assert.match(registration, /addEventListener\("message", forwardLogout\)/);
+  assert.match(registration, /NEXUS_LOGOUT/);
+  assert.match(registration, /NEXUS_CLEAR_CACHES/);
+  assert.match(registration, /serviceWorker\.controller\?\.postMessage/);
+});

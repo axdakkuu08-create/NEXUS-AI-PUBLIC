@@ -18,6 +18,12 @@ Therefore, the service worker must not claim to reject responses by checking `he
 
 This is an explicit server/route contract, not a claim that client-side code can inspect the cookie-setting header. Live candidate response-header evidence remains required before security acceptance.
 
+## Logout cleanup and storage failures
+
+On activation, the worker removes obsolete caches under the NEXUS-owned cache prefix and sanitizes the current public-shell cache. On `NEXUS_LOGOUT`, it advances the write epoch synchronously, removes any current-cache entry that is not both request-eligible and response-cacheable, removes obsolete NEXUS cache versions, and preserves approved public shell entries. `NEXUS_CLEAR_CACHES` removes all NEXUS-owned caches. Unrelated origin Cache Storage entries are not deleted.
+
+CacheStorage `open`, `keys`, Cache `match`, `keys`, `put`, and response/request classification failures are treated as unavailable or non-cacheable. A cache read failure falls back to the network; a cache write failure does not replace a successful network response; an offline navigation returns the generic 503 fallback if the shell cannot be read. This is fail-closed for persistence, not a claim that browser storage is always successfully removable: cleanup failures are contained and require evidence from the actual browser run.
+
 ## Race regression
 
 Cache writes for the same request URL are serialized. A write that began under an earlier cache generation is deleted if logout/clear advances the generation while `Cache.put()` is pending. A subsequent write from the new generation is allowed to run after the stale write and remain stored. The Node harness includes both the delayed-write deletion case and the new-generation preservation case.
@@ -36,4 +42,8 @@ Cache writes for the same request URL are serialized. A write that began under a
 - browser-inaccessible `Set-Cookie` plus the required `no-store` server contract;
 - a cross-origin opaque response not entering the app cache.
 
-These tests do not replace production logout/account-switch tests, live-header inspection, independent review, or physical Android/Chrome validation. Those remain blocked until the corresponding production authentication, deployment, reviewer, and device evidence exists.
+`tests/pwa/m2-hardening.test.mjs` exercises logout cleanup of stale non-public entries, preservation of the public shell and unrelated origin caches, and CacheStorage/Cache API failure paths. `tests/pwa-session-lifecycle.test.mjs` uses clearly labelled test-only identity and session endpoints to exercise two identities using the same URL, BroadcastChannel delivery across two tabs, local offline logout with no false revocation success, retry after connectivity returns, stale-cache removal and session expiry/401 behavior. It does not add or simulate production authentication in the product.
+
+The test-only lifecycle fixture verifies the service-worker cache boundary and the current cross-tab notification protocol. It does not prove a production authentication/logout implementation exists or that every protected application view consumes the broadcast. Those production integration checks remain pending until authentication is implemented.
+
+These tests do not replace live-header inspection, independent review, or physical Android/Chrome validation. Those remain required for security acceptance.

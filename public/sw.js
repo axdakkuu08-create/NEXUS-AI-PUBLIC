@@ -36,58 +36,55 @@ function isPublicAssetPath(pathname) {
 }
 
 function isEligibleRequest(request) {
-  if (request.method !== "GET" || request.mode === "navigate") return false;
-  if (request.headers.has("Authorization")) return false;
-
-  let url;
   try {
-    url = new URL(request.url);
+    if (!request || request.method !== "GET" || request.mode === "navigate") return false;
+    if (request.headers.has("Authorization")) return false;
+
+    const url = new URL(request.url);
+    if (url.origin !== self.location.origin) return false;
+    if (isNextRouteData(request, url)) return false;
+    if (/^\/(api|auth|oauth|session|logout|backend|trpc|graphql)(\/|$)/i.test(url.pathname)) {
+      return false;
+    }
+
+    return isPublicAssetPath(url.pathname);
   } catch {
+    // Uncertain request classification must never broaden cache eligibility.
     return false;
   }
-
-  if (url.origin !== self.location.origin) return false;
-  if (isNextRouteData(request, url)) return false;
-  if (/^\/(api|auth|oauth|session|logout|backend|trpc|graphql)(\/|$)/i.test(url.pathname)) {
-    return false;
-  }
-
-  return isPublicAssetPath(url.pathname);
 }
 
 function isCacheableResponse(request, response) {
-  if (!response || response.status !== 200 || !response.ok) return false;
-  if (response.type === "opaque" || response.type === "opaqueredirect" || response.type === "error") {
-    return false;
-  }
-  if (response.redirected) return false;
-
   try {
+    if (!response || response.status !== 200 || !response.ok) return false;
+    if (["opaque", "opaqueredirect", "error"].includes(response.type)) return false;
+    if (response.redirected) return false;
+
     const requestUrl = new URL(request.url);
     if (requestUrl.origin !== self.location.origin) return false;
     if (response.url && new URL(response.url).origin !== self.location.origin) return false;
+
+    const headers = response.headers;
+    if (!headers) return false;
+
+    // Set-Cookie is a forbidden response header and is not exposed to service-worker
+    // JavaScript. Session-setting/dynamic routes are excluded by the request allowlist;
+    // servers must pair any cookie-setting response with Cache-Control: no-store.
+    const cacheControl = (headers.get("Cache-Control") || "")
+      .split(",")
+      .map((directive) => directive.trim().split("=")[0].toLowerCase());
+    if (cacheControl.some((directive) => ["private", "no-store", "no-cache"].includes(directive))) {
+      return false;
+    }
+
+    const vary = headers.get("Vary");
+    if (vary && vary.split(",").some((value) => value.trim() === "*")) return false;
+
+    return true;
   } catch {
+    // A response that cannot be classified is network-only.
     return false;
   }
-
-  const headers = response.headers;
-  if (!headers) return false;
-
-  // Set-Cookie is a forbidden response header and is not exposed to service-worker
-  // JavaScript. Do not attempt to detect it here. Session-establishing/dynamic
-  // endpoints are excluded by the request allowlist; servers must send no-store
-  // on any response that sets cookies or carries session-specific state.
-  const cacheControl = (headers.get("Cache-Control") || "")
-    .split(",")
-    .map((directive) => directive.trim().split("=")[0].toLowerCase());
-  if (cacheControl.some((directive) => ["private", "no-store", "no-cache"].includes(directive))) {
-    return false;
-  }
-
-  const vary = headers.get("Vary");
-  if (vary && vary.split(",").some((value) => value.trim() === "*")) return false;
-
-  return true;
 }
 
 async function putForGeneration(cache, request, response, requestEpoch) {
@@ -96,8 +93,7 @@ async function putForGeneration(cache, request, response, requestEpoch) {
   const current = previous.catch(() => undefined).then(async () => {
     if (requestEpoch !== cacheEpoch) return;
     await cache.put(request, response.clone());
-    // A write already in progress cannot be cancelled. Remove its result if
-    // logout/account invalidation advanced the generation while put() was pending.
+    // Cache.put() cannot be cancelled. Remove a result committed by an invalidated epoch.
     if (requestEpoch !== cacheEpoch) await cache.delete(request);
   });
   pendingWrites.set(key, current);
@@ -109,9 +105,73 @@ async function putForGeneration(cache, request, response, requestEpoch) {
   }
 }
 
+async function removeUnsafeEntries(cache) {
+  const requests = await cache.keys();
+  await Promise.all(requests.map(async (request) => {
+    try {
+      if (!isEligibleRequest(request)) {
+        await cache.delete(request);
+        return;
+      }
+      const response = await cache.match(request);
+      if (!isCacheableResponse(request, response)) await cache.delete(request);
+    } catch {
+      // If classification or inspection fails, deletion is the safe choice.
+      try { await cache.delete(request); } catch { /* storage is unavailable */ }
+    }
+  }));
+}
+
+async function cleanupOwnedCaches(preservePublicShell) {
+  let keys;
+  try {
+    keys = await caches.keys();
+  } catch {
+    // Continue with the known current cache even if global cache enumeration fails.
+    keys = null;
+  }
+
+  if (keys) {
+    const obsolete = keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME);
+    await Promise.all(obsolete.map(async (key) => {
+      try { await caches.delete(key); } catch { /* best effort; other caches stay untouched */ }
+    }));
+  }
+
+  if (!preservePublicShell) {
+    try { await caches.delete(CACHE_NAME); } catch { /* best effort */ }
+    return;
+  }
+
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    await removeUnsafeEntries(cache);
+  } catch {
+    // If entries cannot be enumerated/sanitized, remove the current app cache rather
+    // than leave legacy private entries behind. Offline navigation then uses 503.
+    try { await caches.delete(CACHE_NAME); } catch { /* CacheStorage may be unavailable */ }
+  }
+}
+
+async function offlineNavigationFallback() {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    const fallback = await cache.match(OFFLINE_URL);
+    if (fallback && isCacheableResponse(new Request(new URL(OFFLINE_URL, self.location.origin)), fallback)) {
+      return fallback;
+    }
+  } catch {
+    // Fall through to a generic response when CacheStorage is unavailable.
+  }
+  return new Response("NEXUS is offline. Reconnect to continue.", {
+    status: 503,
+    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+  });
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    (async () => {
+  event.waitUntil((async () => {
+    try {
       const cache = await caches.open(CACHE_NAME);
       for (const asset of SHELL_ASSETS) {
         try {
@@ -124,96 +184,85 @@ self.addEventListener("install", (event) => {
             await cache.put(request, response.clone());
           }
         } catch {
-          // A missing optional shell asset must not expand the cache policy.
+          // Missing assets and storage errors must not expand the cache policy.
         }
       }
-      await self.skipWaiting();
-    })(),
-  );
+    } catch {
+      // Service-worker installation remains possible without CacheStorage.
+    }
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    (async () => {
-      const keys = await caches.keys();
-      await Promise.all(
-        keys
-          .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
-          .map((key) => caches.delete(key)),
-      );
-      await self.clients.claim();
-    })(),
-  );
+  event.waitUntil((async () => {
+    await cleanupOwnedCaches(true);
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("message", (event) => {
   const type = event.data?.type;
   if (type !== "NEXUS_LOGOUT" && type !== "NEXUS_CLEAR_CACHES") return;
 
-  // Invalidate pending writes before any asynchronous cache operation begins.
+  // Advance the epoch synchronously, before any asynchronous cache cleanup.
   cacheEpoch += 1;
-  event.waitUntil?.(
-    (async () => {
-      if (type === "NEXUS_CLEAR_CACHES") {
-        const keys = await caches.keys();
-        await Promise.all(
-          keys.filter((key) => key.startsWith(CACHE_PREFIX)).map((key) => caches.delete(key)),
-        );
-      }
-      // NEXUS_LOGOUT deliberately preserves the generic public shell. M2 stores no private data.
-    })(),
-  );
+  event.waitUntil?.(cleanupOwnedCaches(type === "NEXUS_LOGOUT"));
 });
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(async () => {
-        const cache = await caches.open(CACHE_NAME);
-        return (
-          (await cache.match(OFFLINE_URL)) ||
-          new Response("NEXUS is offline. Reconnect to continue.", {
-            status: 503,
-            headers: { "Content-Type": "text/plain; charset=utf-8" },
-          })
-        );
-      }),
-    );
+    event.respondWith((async () => {
+      try {
+        return await fetch(request);
+      } catch {
+        return offlineNavigationFallback();
+      }
+    })());
     return;
   }
 
   if (!isEligibleRequest(request)) return;
 
-  event.respondWith(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(request);
+  event.respondWith((async () => {
+    let cache;
+    let cached;
+    try {
+      cache = await caches.open(CACHE_NAME);
+      cached = await cache.match(request);
       if (cached && isCacheableResponse(request, cached)) return cached;
       if (cached) await cache.delete(request);
+    } catch {
+      // CacheStorage read failures are fail-open to the network, never to stale data.
+      cache = undefined;
+      cached = undefined;
+    }
 
-      const requestEpoch = cacheEpoch;
-      try {
-        const response = await fetch(request);
-        if (
-          requestEpoch === cacheEpoch &&
-          isEligibleRequest(request) &&
-          isCacheableResponse(request, response)
-        ) {
-          try {
-            await putForGeneration(cache, request, response, requestEpoch);
-          } catch {
-            // Cache quota/storage failures never change the network response.
-          }
-        }
-        return response;
-      } catch {
-        return new Response("This public NEXUS asset is unavailable offline.", {
-          status: 503,
-          headers: { "Content-Type": "text/plain; charset=utf-8" },
-        });
+    const requestEpoch = cacheEpoch;
+    let response;
+    try {
+      response = await fetch(request);
+    } catch {
+      return new Response("This public NEXUS asset is unavailable offline.", {
+        status: 503,
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+      });
+    }
+
+    try {
+      if (
+        requestEpoch === cacheEpoch &&
+        isEligibleRequest(request) &&
+        isCacheableResponse(request, response)
+      ) {
+        cache = cache || await caches.open(CACHE_NAME);
+        await putForGeneration(cache, request, response, requestEpoch);
       }
-    })(),
-  );
+    } catch {
+      // Quota, open, classification, and write failures never change the network response.
+    }
+    return response;
+  })());
 });
