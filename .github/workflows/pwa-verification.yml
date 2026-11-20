@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - feat/pwa-offline-shell
+      - feat/m2-pwa-default-deny-remediation
+  pull_request:
+    branches:
+      - main
+      - feat/pwa-offline-shell
   workflow_dispatch:
 
 permissions:
@@ -34,6 +39,8 @@ jobs:
         run: npm run test:swarm
       - name: PWA asset tests
         run: node --test tests/pwa-assets.test.mjs
+      - name: Service-worker security tests
+        run: node --test tests/pwa-security.test.mjs
       - name: Production build
         run: npm run build
       - name: Start production server
@@ -49,5 +56,5 @@ jobs:
         run: |
           npm install --no-save --package-lock=false --ignore-scripts playwright --registry=https://registry.npmjs.org --no-audit --no-fund
           npx playwright install --with-deps chromium
-      - name: Mobile offline smoke test
+      - name: Mobile offline and Cache Storage smoke test
         run: node tests/pwa-offline.smoke.mjs
