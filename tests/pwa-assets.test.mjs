@@ -38,4 +38,5 @@ test("service worker and offline fallback are present", async () => {
   assert.match(worker, /cache\.match/);
   assert.match(fallback, /You're offline/);
   assert.match(fallback, /AI responses/);
+  assert.doesNotMatch(fallback, /reopen pages you have already visited/i);
 });

@@ -42,7 +42,7 @@ export function PWARegistration() {
       aria-live="polite"
     >
       <p className="rounded-full border border-[var(--warning)]/40 bg-[var(--bg-elevated)] px-3 py-2 text-xs font-medium text-[var(--warning)] shadow-lg">
-        Offline · saved pages only
+        Offline · public shell only
       </p>
     </div>
   );
