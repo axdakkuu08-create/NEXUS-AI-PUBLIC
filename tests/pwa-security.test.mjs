@@ -9,6 +9,7 @@ function createHarness({ fetchImpl } = {}) {
   const handlers = new Map();
   const cacheStores = new Map();
   const clientsNotified = [];
+  const fetchCalls = [];
   const cacheKey = (request) => typeof request === "string" ? request : request instanceof URL ? request.href : request.url;
   const caches = {
     async open(name) {
@@ -28,17 +29,21 @@ function createHarness({ fetchImpl } = {}) {
     async claim() {},
     async matchAll() { return [{ postMessage: (message) => clientsNotified.push(message) }, { postMessage: (message) => clientsNotified.push(message) }]; },
   };
+  const workerFetch = async (...args) => {
+    fetchCalls.push({ request: args[0], options: args[1] });
+    return fetchImpl ? fetchImpl(...args) : new Response("network", { status: 200 });
+  };
   const self = {
     location: { origin: "https://nexus.test" }, clients,
     addEventListener(type, handler) { handlers.set(type, handler); },
     async skipWaiting() {},
   };
   vm.runInNewContext(workerSource, {
-    self, caches, fetch: fetchImpl ?? (async () => new Response("network", { status: 200 })),
+    self, caches, fetch: workerFetch,
     Request, Response, URL, Promise, Set,
   }, { filename: "sw.js" });
   return {
-    handlers, caches, cacheStores, clientsNotified,
+    handlers, caches, cacheStores, clientsNotified, fetchCalls,
     async dispatchFetch(request) {
       let responsePromise;
       handlers.get("fetch")({ request, respondWith(value) { responsePromise = Promise.resolve(value); } });
@@ -104,14 +109,18 @@ test("RSC, router-state and prefetch requests are not intercepted or cached", as
     new Request("https://nexus.test/home?_rsc=abc"),
     new Request("https://nexus.test/home", { headers: { RSC: "1" } }),
     new Request("https://nexus.test/home", { headers: { "Next-Router-State-Tree": "{}" } }),
-  ]) assert.equal(await h.dispatchFetch(req), null);
+  ]) {
+    assert.ok(await h.dispatchFetch(req));
+    assert.equal(h.fetchCalls.at(-1).options.cache, "no-store");
+  }
   assert.deepEqual(await h.caches.keys(), []);
 });
 
 test("API, auth, session and backend GET requests remain network-only", async () => {
   const h = createHarness();
   for (const path of ["/api/projects", "/api/auth/session", "/auth/logout", "/backend/query"]) {
-    assert.equal(await h.dispatchFetch(asset(path)), null);
+    assert.ok(await h.dispatchFetch(asset(path)));
+    assert.equal(h.fetchCalls.at(-1).options.cache, "no-store");
   }
   assert.deepEqual(await h.caches.keys(), []);
 });
@@ -159,7 +168,9 @@ test("Set-Cookie, Vary star, opaque, redirected and error responses are excluded
 
 test("Authorization-bearing requests cannot enter Cache Storage", async () => {
   const h = createHarness();
-  assert.equal(await h.dispatchFetch(asset("/manifest.webmanifest", { Authorization: "Bearer test-only" })), null);
+  const result = await h.dispatchFetch(asset("/manifest.webmanifest", { Authorization: "Bearer test-only" }));
+  assert.ok(result);
+  assert.equal(h.fetchCalls.at(-1).options.cache, "no-store");
   assert.deepEqual(await h.caches.keys(), []);
 });
 
