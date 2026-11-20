@@ -7,10 +7,8 @@ The PWA layer keeps the existing Next.js application architecture. It adds insta
 ## Security-first offline behavior
 
 - The service worker persists only four exact same-origin public shell paths: `/offline.html`, `/manifest.webmanifest`, `/icons/nexus-192.png`, and `/icons/nexus-512.png`.
-- Successful same-origin page navigations and Next.js route-data responses are cached as the user visits them.
-- Next.js immutable static assets are cached for repeat use.
 - A failed navigation returns only the generic public offline information page; a previously visited workspace page is never replayed offline.
-- All unapproved paths remain network-only and are never persisted.
+- All Next.js route-data/RSC/prefetch, API/backend, authentication/session, and unapproved paths are network-only. Their GET fetches bypass the browser HTTP cache and are never persisted by the service worker.
 - AI inference, authentication, cloud sync, and backend-dependent actions remain unavailable without connectivity.
 - This is a network-assisted PWA, not an on-device AI application.
 
