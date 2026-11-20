@@ -236,6 +236,15 @@ function toFailure(
 export async function discoverOllama(
   fetcher: typeof fetch = fetch
 ): Promise<OllamaDiscoveryResult> {
+  // Defense in depth: even an accidental client import must never probe browser loopback.
+  if (typeof window !== "undefined") {
+    return {
+      status: "unreachable",
+      endpoint: "configuration",
+      reason: "invalid-configuration",
+    };
+  }
+
   const target = getOllamaOrigin();
   if (!target.ok) {
     return {
