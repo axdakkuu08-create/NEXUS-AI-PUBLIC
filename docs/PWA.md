@@ -4,13 +4,13 @@
 
 The PWA layer keeps the existing Next.js application architecture. It adds install metadata, a service worker, an offline fallback, and a small install/offline status control. It does not add a second application or a native Android project.
 
-## Offline behavior
+## Security-first offline behavior
 
-- The service worker precaches the offline page, web manifest, and app icons.
+- The service worker persists only four exact same-origin public shell paths: `/offline.html`, `/manifest.webmanifest`, `/icons/nexus-192.png`, and `/icons/nexus-512.png`.
 - Successful same-origin page navigations and Next.js route-data responses are cached as the user visits them.
 - Next.js immutable static assets are cached for repeat use.
-- A previously visited page can be reopened when offline if its navigation response and required assets were cached.
-- An unvisited page falls back to the offline information page.
+- A failed navigation returns only the generic public offline information page; a previously visited workspace page is never replayed offline.
+- All unapproved paths remain network-only and are never persisted.
 - AI inference, authentication, cloud sync, and backend-dependent actions remain unavailable without connectivity.
 - This is a network-assisted PWA, not an on-device AI application.
 
@@ -26,6 +26,11 @@ The PWA layer keeps the existing Next.js application architecture. It adds insta
 
 ## Verification
 
-The `NEXUS PWA verification` workflow runs lint, TypeScript, existing Swarm tests, PWA asset checks, a production build, and a Chromium mobile/offline smoke test.
+The `NEXUS PWA verification` workflow runs lint, TypeScript, existing Swarm tests, PWA asset checks, service-worker security tests, a production build, and a Chromium mobile/offline smoke test. The smoke test inspects actual Cache Storage and verifies that visited workspace routes are not replayed offline.
 
 A successful CI run is not a substitute for physical-device testing. Record the Android model, Chrome version, install result, and offline results separately.
+
+
+## Session lifecycle boundary
+
+Authenticated offline data is prohibited. The worker responds to `NEXUS_SESSION_END` and `NEXUS_ACCOUNT_CHANGE` by clearing only NEXUS-owned private cache namespaces and notifying same-origin tabs. `src/lib/pwa/session.ts` provides a notification/subscription hook for a future authentication integration; it does not implement authentication, server-side revocation, or a logout UI. The current frontend has no production authentication flow. Sensitive backend responses must use reviewed `Cache-Control: no-store` headers when a backend is later connected. Cookie request headers are generally unavailable to service-worker script, so cache eligibility is determined by the strict route allowlist, not by cookie inspection.
