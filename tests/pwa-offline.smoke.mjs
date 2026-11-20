@@ -30,18 +30,28 @@ try {
     "the mobile home workspace should render",
   );
 
-  await context.setOffline(true);
-  const cachedResponse = await page.goto(baseUrl + "/home", { waitUntil: "domcontentloaded" });
-  assert.ok(cachedResponse && cachedResponse.status() === 200, "visited home page should load from cache");
-  assert.equal(
-    await page.getByText("NEXUS-AI Command Center").count(),
-    1,
-    "cached home page should remain readable offline",
-  );
-
-  const fallbackResponse = await page.goto(baseUrl + "/pwa-offline-test-unvisited", {
-    waitUntil: "domcontentloaded",
+  const cacheSnapshot = await page.evaluate(async () => {
+    const names = await caches.keys();
+    const entries = await Promise.all(names.map(async (name) => ({
+      name,
+      urls: (await (await caches.open(name)).keys()).map((request) => new URL(request.url).pathname),
+    })));
+    return { names, entries };
   });
+  assert.ok(cacheSnapshot.names.includes("nexus-pwa-public-v2"), "public shell cache should exist");
+  const allowed = new Set(["/offline.html", "/manifest.webmanifest", "/icons/nexus-192.png", "/icons/nexus-512.png"]);
+  for (const entry of cacheSnapshot.entries) {
+    assert.equal(entry.name, "nexus-pwa-public-v2", "only the designated NEXUS public cache may exist");
+    for (const pathname of entry.urls) assert.ok(allowed.has(pathname), "unexpected cached path: " + pathname);
+  }
+
+  await context.setOffline(true);
+  const previouslyVisited = await page.goto(baseUrl + "/home", { waitUntil: "domcontentloaded" });
+  assert.ok(previouslyVisited && previouslyVisited.status() === 200, "offline navigation should receive the generic shell");
+  assert.equal(await page.getByRole("heading", { name: "You're offline" }).count(), 1);
+  assert.equal(await page.getByText("NEXUS-AI Command Center").count(), 0, "previously visited private page must not be replayed offline");
+
+  const fallbackResponse = await page.goto(baseUrl + "/pwa-offline-test-unvisited", { waitUntil: "domcontentloaded" });
   assert.ok(fallbackResponse && fallbackResponse.status() === 200, "unvisited navigation should receive the offline fallback");
   assert.equal(await page.getByRole("heading", { name: "You're offline" }).count(), 1);
 
