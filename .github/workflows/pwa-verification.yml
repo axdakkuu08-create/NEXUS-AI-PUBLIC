@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - feat/pwa-offline-shell
-      - feat/m2-pwa-default-deny-remediation
   pull_request:
     branches:
       - main
