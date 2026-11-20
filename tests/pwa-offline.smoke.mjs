@@ -19,6 +19,8 @@ try {
   assert.equal(await page.locator('link[rel="manifest"]').getAttribute("href"), "/manifest.webmanifest");
 
   await page.evaluate(async () => {
+    const legacy = await caches.open("nexus-pwa-v1");
+    await legacy.put(new URL("/home", location.origin), new Response("LEGACY PRIVATE CACHE FIXTURE"));
     await navigator.serviceWorker.ready;
   });
   await page.reload({ waitUntil: "networkidle" });
@@ -39,6 +41,7 @@ try {
     return { names, entries };
   });
   assert.ok(cacheSnapshot.names.includes("nexus-pwa-public-v2"), "public shell cache should exist");
+  assert.equal(cacheSnapshot.names.includes("nexus-pwa-v1"), false, "legacy broad cache must be removed on activation");
   const allowed = new Set(["/offline.html", "/manifest.webmanifest", "/icons/nexus-192.png", "/icons/nexus-512.png"]);
   for (const entry of cacheSnapshot.entries) {
     assert.equal(entry.name, "nexus-pwa-public-v2", "only the designated NEXUS public cache may exist");
