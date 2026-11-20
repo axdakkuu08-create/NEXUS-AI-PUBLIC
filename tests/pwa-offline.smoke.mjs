@@ -11,16 +11,29 @@ try {
     isMobile: true,
     hasTouch: true,
   });
-  const page = await context.newPage();
 
+  // Seed the old cache before the application registers the worker. Creating
+  // it after activation would test a cache created too late for activation cleanup.
+  await context.addInitScript(() => {
+    const serviceWorker = navigator.serviceWorker;
+    const originalRegister = serviceWorker.register.bind(serviceWorker);
+    serviceWorker.register = async (...args) => {
+      const legacy = await caches.open("nexus-pwa-v1");
+      await legacy.put(
+        new URL("/home", location.origin),
+        new Response("LEGACY PRIVATE CACHE FIXTURE"),
+      );
+      return originalRegister(...args);
+    };
+  });
+
+  const page = await context.newPage();
   const response = await page.goto(baseUrl + "/home", { waitUntil: "networkidle" });
   assert.ok(response && response.status() === 200, "home route should load online");
   assert.match(await page.title(), /NEXUS-AI/);
   assert.equal(await page.locator('link[rel="manifest"]').getAttribute("href"), "/manifest.webmanifest");
 
   await page.evaluate(async () => {
-    const legacy = await caches.open("nexus-pwa-v1");
-    await legacy.put(new URL("/home", location.origin), new Response("LEGACY PRIVATE CACHE FIXTURE"));
     await navigator.serviceWorker.ready;
   });
   await page.reload({ waitUntil: "networkidle" });
