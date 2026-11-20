@@ -11,23 +11,18 @@ try {
     isMobile: true,
     hasTouch: true,
   });
+  const page = await context.newPage();
 
-  // Seed the old cache before the application registers the worker. Creating
-  // it after activation would test a cache created too late for activation cleanup.
-  await context.addInitScript(() => {
-    const serviceWorker = navigator.serviceWorker;
-    const originalRegister = serviceWorker.register.bind(serviceWorker);
-    serviceWorker.register = async (...args) => {
-      const legacy = await caches.open("nexus-pwa-v1");
-      await legacy.put(
-        new URL("/home", location.origin),
-        new Response("LEGACY PRIVATE CACHE FIXTURE"),
-      );
-      return originalRegister(...args);
-    };
+  // Seed the legacy cache from the static offline document, which does not
+  // mount the app or register the worker. The first app navigation then
+  // installs/activates the worker and must remove this pre-existing cache.
+  const offlineDocument = await page.goto(baseUrl + "/offline.html", { waitUntil: "networkidle" });
+  assert.ok(offlineDocument && offlineDocument.status() === 200, "public offline document should load before app registration");
+  await page.evaluate(async () => {
+    const legacy = await caches.open("nexus-pwa-v1");
+    await legacy.put(new URL("/home", location.origin), new Response("LEGACY PRIVATE CACHE FIXTURE"));
   });
 
-  const page = await context.newPage();
   const response = await page.goto(baseUrl + "/home", { waitUntil: "networkidle" });
   assert.ok(response && response.status() === 200, "home route should load online");
   assert.match(await page.title(), /NEXUS-AI/);
