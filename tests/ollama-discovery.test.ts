@@ -3,7 +3,6 @@ import test from "node:test";
 import {
   discoverOllama,
   OLLAMA_REQUEST_TIMEOUT_MS,
-  type OllamaDiscoveryResult,
 } from "../src/lib/server/ollama/discovery.ts";
 
 const originalOrigin = process.env.NEXUS_OLLAMA_ORIGIN;
