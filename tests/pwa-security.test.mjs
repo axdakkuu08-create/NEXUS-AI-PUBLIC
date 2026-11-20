@@ -223,6 +223,7 @@ test("cache classification and storage failures fail closed", async () => {
 
 test("activation removes only obsolete NEXUS public caches", async () => {
   const h = createHarness();
+  await h.caches.open("nexus-pwa-v1");
   await h.caches.open("nexus-pwa-public-v1");
   await h.caches.open("nexus-pwa-public-v2");
   await h.caches.open("unrelated-origin-cache");
