@@ -55,7 +55,7 @@ self.addEventListener("install", (event) => {
     const cache = await caches.open(CACHE_NAME);
     for (const path of SHELL_ASSETS) {
       const request = new Request(new URL(path, self.location.origin), { method: "GET", cache: "reload" });
-      const response = await fetch(request);
+      const response = await fetch(request, { cache: "no-store" });
       if (isSafePublicResponse(response)) {
         await cache.put(request, response.clone());
       }
@@ -102,7 +102,7 @@ self.addEventListener("fetch", (event) => {
     // generic public offline page, never a previously visited application page.
     event.respondWith((async () => {
       try {
-        return await fetch(request);
+        return await fetch(request, { cache: "no-store" });
       } catch {
         const cache = await caches.open(CACHE_NAME);
         return (await cache.match(new URL("/offline.html", self.location.origin))) ||
@@ -115,7 +115,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (!isApprovedPublicAsset(request)) return;
+  if (!isApprovedPublicAsset(request)) {
+    // Same-origin GETs outside the allowlist bypass the browser HTTP cache too.
+    event.respondWith(fetch(request, { cache: "no-store" }));
+    return;
+  }
   event.respondWith((async () => {
     let cache;
     let cached;
