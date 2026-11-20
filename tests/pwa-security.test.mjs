@@ -85,6 +85,7 @@ test("only exact public shell assets are eligible for cache storage", async () =
   const h = createHarness({ fetchImpl: async () => response("asset") });
   const result = await h.dispatchFetch(asset());
   assert.equal(await result.text(), "asset");
+  assert.equal(h.fetchCalls.at(-1).options.cache, "no-store");
   assert.deepEqual(await h.caches.keys(), ["nexus-pwa-public-v2"]);
   assert.equal(h.cacheStores.get("nexus-pwa-public-v2").size, 1);
 });
@@ -103,7 +104,7 @@ test("offline navigation returns only generic offline shell, not a visited page"
   assert.equal(await result.text(), "GENERIC OFFLINE SHELL");
 });
 
-test("RSC, router-state and prefetch requests are not intercepted or cached", async () => {
+test("RSC, router-state and prefetch requests are network-only and not cached", async () => {
   const h = createHarness();
   for (const req of [
     new Request("https://nexus.test/home?_rsc=abc"),
@@ -125,9 +126,10 @@ test("API, auth, session and backend GET requests remain network-only", async ()
   assert.deepEqual(await h.caches.keys(), []);
 });
 
-test("query variants are excluded from the public asset allowlist", async () => {
+test("query variants are network-only and excluded from the public asset cache", async () => {
   const h = createHarness();
-  assert.equal(await h.dispatchFetch(asset("/manifest.webmanifest?v=2")), null);
+  assert.ok(await h.dispatchFetch(asset("/manifest.webmanifest?v=2")));
+  assert.equal(h.fetchCalls.at(-1).options.cache, "no-store");
   assert.deepEqual(await h.caches.keys(), []);
 });
 
