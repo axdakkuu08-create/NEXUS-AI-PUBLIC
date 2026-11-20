@@ -131,7 +131,7 @@ self.addEventListener("fetch", (event) => {
     }
 
     try {
-      const response = await fetch(request);
+      const response = await fetch(request, { cache: "no-store" });
       if (isSafePublicResponse(response)) {
         try {
           await cacheApprovedAsset(request, response.clone());
