@@ -29,13 +29,6 @@ function setOrigin(value?: string) {
   else process.env.NEXUS_OLLAMA_ORIGIN = value;
 }
 
-function assertStatus(
-  result: OllamaDiscoveryResult,
-  status: OllamaDiscoveryResult["status"]
-) {
-  assert.equal(result.status, status);
-}
-
 test.beforeEach(() => setOrigin());
 test.after(() => {
   if (originalOrigin === undefined) delete process.env.NEXUS_OLLAMA_ORIGIN;
@@ -142,6 +135,22 @@ test("malformed tags are not Ollama", async () => {
     status: "not-ollama",
     endpoint: "tags",
     reason: "invalid-payload",
+  });
+});
+
+test("non-JSON responses are rejected as not Ollama", async () => {
+  const result = await discoverOllama(async (input) =>
+    String(input).endsWith("/api/tags")
+      ? new Response("<html>not Ollama</html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        })
+      : jsonResponse({ version: "0.5.7" })
+  );
+  assert.deepEqual(result, {
+    status: "not-ollama",
+    endpoint: "tags",
+    reason: "invalid-content-type",
   });
 });
 
