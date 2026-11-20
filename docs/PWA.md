@@ -16,10 +16,10 @@ The PWA layer keeps the existing Next.js application architecture. It adds insta
 
 1. Serve the production build from an HTTPS origin. Service workers and install prompts require HTTPS, except on localhost.
 2. Open the HTTPS preview in Chrome on the Android device.
-3. Visit `/home` and any other pages intended for offline testing while connected.
+3. Open `/home` while connected and wait for the service worker to activate.
 4. Use Chrome's **Install app** or **Add to Home screen** option when offered.
-5. Open NEXUS from the installed icon, revisit a page already loaded, then enable Airplane mode.
-6. Confirm the offline status indicator appears, a cached page opens, and an unvisited page shows the offline fallback.
+5. Open NEXUS from the installed icon, then enable Airplane mode.
+6. Confirm workspace navigations show only the generic offline information page; previously viewed workspace content must not appear offline.
 7. Turn connectivity back on and confirm normal navigation resumes.
 
 ## Verification
