@@ -34,7 +34,7 @@ test.after(() => {
   else process.env.NEXUS_OLLAMA_ORIGIN = originalOrigin;
 });
 
-test("ready requires both tags and a non-empty version", async () => {
+test("ready requires both tags and a non-empty version and uses the published field names", async () => {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const result = await discoverOllama(async (input, init) => {
     const url = String(input);
@@ -50,13 +50,13 @@ test("ready requires both tags and a non-empty version", async () => {
   });
 
   assert.deepEqual(result, {
-    status: "ready",
+    state: "ready",
     version: "0.5.7",
     models: [{
       name: "llama3.2:latest",
-      sizeBytes: 1024,
-      parameterSize: "3.2B",
-      quantizationLevel: "Q4_K_M",
+      bytes: 1024,
+      parameters: "3.2B",
+      quantization: "Q4_K_M",
     }],
   });
   assert.deepEqual(calls.map((call) => call.url).sort(), [
@@ -79,24 +79,50 @@ test("no-models requires a valid non-empty version", async () => {
       ? jsonResponse(tags([]))
       : jsonResponse({ version: "0.5.7" })
   );
-  assert.deepEqual(result, { status: "no-models", version: "0.5.7", models: [] });
+  assert.deepEqual(result, { state: "no-models", version: "0.5.7", models: [] });
 });
 
-test("cloud tags and OpenMausBot aliases are excluded", async () => {
+test("cloud, cloud-preview, embedding families, and OpenMausBot aliases are excluded", async () => {
+  const excluded = [
+    "cloud",
+    "llama3:cloud",
+    "llama3:cloud-preview",
+    "qwen3-cloud",
+    "nomic-embed-text",
+    "bge-m3",
+    "all-minilm",
+    "debertav3",
+    "llama3.2-omb-4k",
+  ];
   const result = await discoverOllama(async (input) =>
     String(input).endsWith("/api/tags")
       ? jsonResponse(tags([
-          model("llama3.2:cloud"),
-          model("qwen3-cloud"),
-          model("llama3.2-omb-4k"),
+          ...excluded.map((name) => model(name)),
           model("mistral:latest", 2048),
         ]))
       : jsonResponse({ version: "0.5.7" })
   );
-  assert.equal(result.status, "ready");
-  if (result.status === "ready") {
+  assert.equal(result.state, "ready");
+  if (result.state === "ready") {
     assert.deepEqual(result.models.map((entry) => entry.name), ["mistral:latest"]);
   }
+});
+
+test("nameless and blank-name tag entries are skipped without invalidating valid models", async () => {
+  const result = await discoverOllama(async (input) =>
+    String(input).endsWith("/api/tags")
+      ? jsonResponse(tags([
+          {},
+          { name: "   ", size: 1 },
+          model("mistral:latest", 2048),
+        ]))
+      : jsonResponse({ version: "0.5.7" })
+  );
+  assert.deepEqual(result, {
+    state: "ready",
+    version: "0.5.7",
+    models: [{ name: "mistral:latest", bytes: 2048 }],
+  });
 });
 
 test("tags alone never report ready when the version request fails", async () => {
@@ -105,9 +131,9 @@ test("tags alone never report ready when the version request fails", async () =>
     throw new TypeError("connection refused");
   });
   assert.deepEqual(result, {
-    status: "unreachable",
+    state: "not-running",
     endpoint: "version",
-    reason: "request-failed",
+    problem: "request-failed",
   });
 });
 
@@ -118,9 +144,9 @@ test("an empty or missing version is not Ollama", async () => {
       : jsonResponse({ version: "  " })
   );
   assert.deepEqual(result, {
-    status: "not-ollama",
+    state: "not-ollama",
     endpoint: "version",
-    reason: "invalid-payload",
+    problem: "invalid-payload",
   });
 });
 
@@ -131,9 +157,9 @@ test("malformed tags are not Ollama", async () => {
       : jsonResponse({ version: "0.5.7" })
   );
   assert.deepEqual(result, {
-    status: "not-ollama",
+    state: "not-ollama",
     endpoint: "tags",
-    reason: "invalid-payload",
+    problem: "invalid-payload",
   });
 });
 
@@ -147,34 +173,34 @@ test("non-JSON responses are rejected as not Ollama", async () => {
       : jsonResponse({ version: "0.5.7" })
   );
   assert.deepEqual(result, {
-    status: "not-ollama",
+    state: "not-ollama",
     endpoint: "tags",
-    reason: "invalid-content-type",
+    problem: "invalid-content-type",
   });
 });
 
-test("HTTP failures remain typed as unreachable", async () => {
+test("HTTP failures remain typed as not-running", async () => {
   const result = await discoverOllama(async (input) =>
     String(input).endsWith("/api/tags")
       ? jsonResponse(tags([]))
       : jsonResponse({ error: "unavailable" }, 503)
   );
   assert.deepEqual(result, {
-    status: "unreachable",
+    state: "not-running",
     endpoint: "version",
-    reason: "http-error",
+    problem: "http-error",
     httpStatus: 503,
   });
 });
 
-test("request timeout is two seconds and classified", async () => {
+test("request timeout is two seconds and classified as not-running", async () => {
   const result = await discoverOllama(async (_input, init) => {
     assert.ok(init?.signal);
     assert.equal(OLLAMA_REQUEST_TIMEOUT_MS, 2_000);
     throw new DOMException("timed out", "TimeoutError");
   });
-  assert.equal(result.status, "unreachable");
-  if (result.status === "unreachable") assert.equal(result.reason, "timeout");
+  assert.equal(result.state, "not-running");
+  if (result.state === "not-running") assert.equal(result.problem, "timeout");
 });
 
 test("backend origin comes only from server configuration", async () => {
@@ -200,9 +226,62 @@ test("invalid origin configuration fails closed without network requests", async
     return jsonResponse({});
   });
   assert.deepEqual(result, {
-    status: "unreachable",
+    state: "not-running",
     endpoint: "configuration",
-    reason: "invalid-configuration",
+    problem: "invalid-configuration",
   });
   assert.equal(calls, 0);
+});
+
+test("redirect responses cannot be followed or reported as ready", async () => {
+  const result = await discoverOllama(async (_input, init) => {
+    assert.equal(init?.redirect, "error");
+    throw new TypeError("redirect mode is error");
+  });
+  assert.deepEqual(result, {
+    state: "not-running",
+    endpoint: "tags",
+    problem: "request-failed",
+  });
+});
+
+test("browser execution is blocked before any loopback request", async () => {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {},
+  });
+  let calls = 0;
+  try {
+    const result = await discoverOllama(async () => {
+      calls++;
+      return jsonResponse({});
+    });
+    assert.deepEqual(result, {
+      state: "not-running",
+      endpoint: "configuration",
+      problem: "invalid-configuration",
+    });
+    assert.equal(calls, 0);
+  } finally {
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});
+
+test("response bodies larger than 256 KiB are rejected while streaming", async () => {
+  const oversized = " ".repeat(256 * 1024 + 1);
+  const result = await discoverOllama(async (input) =>
+    String(input).endsWith("/api/tags")
+      ? new Response(oversized, {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      : jsonResponse({ version: "0.5.7" })
+  );
+  assert.deepEqual(result, {
+    state: "not-running",
+    endpoint: "tags",
+    problem: "response-too-large",
+  });
 });
