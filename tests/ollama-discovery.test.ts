@@ -193,14 +193,26 @@ test("HTTP failures remain typed as not-running", async () => {
   });
 });
 
-test("request timeout is two seconds and classified as not-running", async () => {
-  const result = await discoverOllama(async (_input, init) => {
-    assert.ok(init?.signal);
+test("request timeout is exactly two seconds and classified as not-running", async () => {
+  const originalTimeout = AbortSignal.timeout;
+  let requestedTimeout = 0;
+  AbortSignal.timeout = ((milliseconds: number) => {
+    requestedTimeout = milliseconds;
+    return new AbortController().signal;
+  }) as typeof AbortSignal.timeout;
+
+  try {
+    const result = await discoverOllama(async (_input, init) => {
+      assert.ok(init?.signal);
+      throw new DOMException("timed out", "TimeoutError");
+    });
     assert.equal(OLLAMA_REQUEST_TIMEOUT_MS, 2_000);
-    throw new DOMException("timed out", "TimeoutError");
-  });
-  assert.equal(result.state, "not-running");
-  if (result.state === "not-running") assert.equal(result.problem, "timeout");
+    assert.equal(requestedTimeout, 2_000);
+    assert.equal(result.state, "not-running");
+    if (result.state === "not-running") assert.equal(result.problem, "timeout");
+  } finally {
+    AbortSignal.timeout = originalTimeout;
+  }
 });
 
 test("backend origin comes only from server configuration", async () => {
@@ -267,6 +279,25 @@ test("browser execution is blocked before any loopback request", async () => {
     if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
     else Reflect.deleteProperty(globalThis, "window");
   }
+});
+
+test("declared Content-Length above 256 KiB is rejected before reading the body", async () => {
+  const result = await discoverOllama(async (input) =>
+    String(input).endsWith("/api/tags")
+      ? new Response("{}", {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "content-length": String(256 * 1024 + 1),
+          },
+        })
+      : jsonResponse({ version: "0.5.7" })
+  );
+  assert.deepEqual(result, {
+    state: "not-running",
+    endpoint: "tags",
+    problem: "response-too-large",
+  });
 });
 
 test("response bodies larger than 256 KiB are rejected while streaming", async () => {
