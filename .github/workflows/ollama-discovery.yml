@@ -1,0 +1,25 @@
+name: Ollama discovery contract
+
+on:
+  push:
+    branches:
+      - feat/ollama-discovery-contract
+
+permissions:
+  contents: read
+
+jobs:
+  ollama-discovery:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run discovery contract tests
+        run: npm run test:ollama
