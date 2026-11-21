@@ -13,14 +13,14 @@ const DEFAULT_OLLAMA_ORIGIN = "http://127.0.0.1:11434";
 
 export type OllamaModel = {
   name: string;
-  sizeBytes: number;
-  parameterSize?: string;
-  quantizationLevel?: string;
+  bytes: number;
+  parameters?: string;
+  quantization?: string;
 };
 
 export type DiscoveryEndpoint = "tags" | "version" | "configuration";
 
-export type DiscoveryFailureReason =
+export type DiscoveryProblem =
   | "timeout"
   | "request-failed"
   | "http-error"
@@ -31,32 +31,32 @@ export type DiscoveryFailureReason =
   | "invalid-configuration";
 
 export type OllamaDiscoveryResult =
-  | { status: "ready"; version: string; models: OllamaModel[] }
-  | { status: "no-models"; version: string; models: [] }
+  | { state: "ready"; version: string; models: OllamaModel[] }
+  | { state: "no-models"; version: string; models: [] }
   | {
-      status: "unreachable";
+      state: "not-running";
       endpoint: DiscoveryEndpoint;
-      reason: DiscoveryFailureReason;
+      problem: DiscoveryProblem;
       httpStatus?: number;
     }
   | {
-      status: "not-ollama";
+      state: "not-ollama";
       endpoint: "tags" | "version";
-      reason: "invalid-content-type" | "invalid-json" | "invalid-payload";
+      problem: "invalid-content-type" | "invalid-json" | "invalid-payload";
     };
 
 type JsonFetchResult =
   | { ok: true; value: unknown }
   | {
       ok: false;
-      kind: "unreachable";
-      reason: "timeout" | "request-failed" | "http-error" | "response-too-large";
+      kind: "not-running";
+      problem: "timeout" | "request-failed" | "http-error" | "response-too-large";
       httpStatus?: number;
     }
   | {
       ok: false;
-      kind: "invalid";
-      reason: "invalid-content-type" | "invalid-json" | "invalid-payload";
+      kind: "not-ollama";
+      problem: "invalid-content-type" | "invalid-json";
     };
 
 function getOllamaOrigin():
@@ -105,8 +105,8 @@ async function fetchJson(
         : "";
     return {
       ok: false,
-      kind: "unreachable",
-      reason: name === "TimeoutError" || name === "AbortError"
+      kind: "not-running",
+      problem: name === "TimeoutError" || name === "AbortError"
         ? "timeout"
         : "request-failed",
     };
@@ -115,37 +115,48 @@ async function fetchJson(
   if (!response.ok) {
     return {
       ok: false,
-      kind: "unreachable",
-      reason: "http-error",
+      kind: "not-running",
+      problem: "http-error",
       httpStatus: response.status,
     };
   }
 
   const contentType = response.headers.get("content-type") || "";
   if (!/^application\/json(?:\s*;|\s*$)/i.test(contentType)) {
-    return { ok: false, kind: "invalid", reason: "invalid-content-type" };
+    return { ok: false, kind: "not-ollama", problem: "invalid-content-type" };
   }
 
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
-    return { ok: false, kind: "unreachable", reason: "response-too-large" };
+    return { ok: false, kind: "not-running", problem: "response-too-large" };
   }
 
-  let body: string;
+  let body = "";
   try {
-    body = await response.text();
+    const reader = response.body?.getReader();
+    if (reader) {
+      const decoder = new TextDecoder();
+      let totalBytes = 0;
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        totalBytes += chunk.value.byteLength;
+        if (totalBytes > MAX_RESPONSE_BYTES) {
+          await reader.cancel();
+          return { ok: false, kind: "not-running", problem: "response-too-large" };
+        }
+        body += decoder.decode(chunk.value, { stream: true });
+      }
+      body += decoder.decode();
+    }
   } catch {
-    return { ok: false, kind: "unreachable", reason: "request-failed" };
-  }
-
-  if (new TextEncoder().encode(body).byteLength > MAX_RESPONSE_BYTES) {
-    return { ok: false, kind: "unreachable", reason: "response-too-large" };
+    return { ok: false, kind: "not-running", problem: "request-failed" };
   }
 
   try {
     return { ok: true, value: JSON.parse(body) as unknown };
   } catch {
-    return { ok: false, kind: "invalid", reason: "invalid-json" };
+    return { ok: false, kind: "not-ollama", problem: "invalid-json" };
   }
 }
 
@@ -160,7 +171,16 @@ function parseVersion(value: unknown): string | null {
 }
 
 function isExcludedModelName(name: string): boolean {
-  return /(?::cloud|-cloud)$/i.test(name) || /-omb-\d+k$/i.test(name);
+  const baseName = name.split(":")[0] ?? name;
+  const isCloud =
+    name === "cloud" ||
+    baseName === "cloud" ||
+    /(?:^|:)cloud(?:$|-)/i.test(name) ||
+    /-cloud$/i.test(baseName);
+  const isEmbedding =
+    /embed|bge-|minilm|bert(?=[:/]|$)/i.test(name);
+  const isOpenMausBotAlias = /-omb-\d+k$/i.test(name);
+  return isCloud || isEmbedding || isOpenMausBotAlias;
 }
 
 function parseModels(value: unknown): OllamaModel[] | null {
@@ -170,10 +190,11 @@ function parseModels(value: unknown): OllamaModel[] | null {
   const seen = new Set<string>();
 
   for (const entry of value.models) {
-    if (!isRecord(entry) || typeof entry.name !== "string") return null;
+    // Upstream tags can contain incomplete records; skip entries without a usable name.
+    if (!isRecord(entry) || typeof entry.name !== "string") continue;
 
     const name = entry.name.trim().toLowerCase();
-    if (!name) return null;
+    if (!name) continue;
     if (isExcludedModelName(name)) continue;
 
     if (
@@ -187,11 +208,11 @@ function parseModels(value: unknown): OllamaModel[] | null {
     const details = entry.details === undefined ? {} : entry.details;
     if (!isRecord(details)) return null;
 
-    const parameterSize =
+    const parameters =
       typeof details.parameter_size === "string"
         ? details.parameter_size.trim()
         : "";
-    const quantizationLevel =
+    const quantization =
       typeof details.quantization_level === "string"
         ? details.quantization_level.trim()
         : "";
@@ -201,11 +222,9 @@ function parseModels(value: unknown): OllamaModel[] | null {
 
     models.push({
       name,
-      sizeBytes: entry.size,
-      ...(parameterSize ? { parameterSize } : {}),
-      ...(quantizationLevel
-        ? { quantizationLevel: quantizationLevel.toUpperCase() }
-        : {}),
+      bytes: entry.size,
+      ...(parameters ? { parameters } : {}),
+      ...(quantization ? { quantization: quantization.toUpperCase() } : {}),
     });
   }
 
@@ -216,17 +235,15 @@ function toFailure(
   endpoint: "tags" | "version",
   result: Exclude<JsonFetchResult, { ok: true }>
 ): OllamaDiscoveryResult {
-  if (result.kind === "unreachable") {
+  if (result.kind === "not-running") {
     return {
-      status: "unreachable",
+      state: "not-running",
       endpoint,
-      reason: result.reason,
-      ...(result.httpStatus === undefined
-        ? {}
-        : { httpStatus: result.httpStatus }),
+      problem: result.problem,
+      ...(result.httpStatus === undefined ? {} : { httpStatus: result.httpStatus }),
     };
   }
-  return { status: "not-ollama", endpoint, reason: result.reason };
+  return { state: "not-ollama", endpoint, problem: result.problem };
 }
 
 /**
@@ -239,18 +256,18 @@ export async function discoverOllama(
   // Defense in depth: even an accidental client import must never probe browser loopback.
   if (typeof window !== "undefined") {
     return {
-      status: "unreachable",
+      state: "not-running",
       endpoint: "configuration",
-      reason: "invalid-configuration",
+      problem: "invalid-configuration",
     };
   }
 
   const target = getOllamaOrigin();
   if (!target.ok) {
     return {
-      status: "unreachable",
+      state: "not-running",
       endpoint: "configuration",
-      reason: "invalid-configuration",
+      problem: "invalid-configuration",
     };
   }
 
@@ -260,10 +277,10 @@ export async function discoverOllama(
   ]);
 
   // Both endpoints must be reachable. Tags alone can never establish readiness.
-  if (!tagsResult.ok && tagsResult.kind === "unreachable") {
+  if (!tagsResult.ok && tagsResult.kind === "not-running") {
     return toFailure("tags", tagsResult);
   }
-  if (!versionResult.ok && versionResult.kind === "unreachable") {
+  if (!versionResult.ok && versionResult.kind === "not-running") {
     return toFailure("version", versionResult);
   }
   if (!tagsResult.ok) return toFailure("tags", tagsResult);
@@ -271,19 +288,19 @@ export async function discoverOllama(
 
   const models = parseModels(tagsResult.value);
   if (!models) {
-    return { status: "not-ollama", endpoint: "tags", reason: "invalid-payload" };
+    return { state: "not-ollama", endpoint: "tags", problem: "invalid-payload" };
   }
 
   const version = parseVersion(versionResult.value);
   if (!version) {
     return {
-      status: "not-ollama",
+      state: "not-ollama",
       endpoint: "version",
-      reason: "invalid-payload",
+      problem: "invalid-payload",
     };
   }
 
   return models.length > 0
-    ? { status: "ready", version, models }
-    : { status: "no-models", version, models: [] };
+    ? { state: "ready", version, models }
+    : { state: "no-models", version, models: [] };
 }
