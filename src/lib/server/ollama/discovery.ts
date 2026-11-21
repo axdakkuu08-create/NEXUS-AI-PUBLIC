@@ -177,8 +177,7 @@ function isExcludedModelName(name: string): boolean {
     baseName === "cloud" ||
     /(?:^|:)cloud(?:$|-)/i.test(name) ||
     /-cloud$/i.test(baseName);
-  const isEmbedding =
-    /embed|bge-|minilm|bert(?=[:/]|$)/i.test(name);
+  const isEmbedding = /embed|bge-|minilm|bert/i.test(name);
   const isOpenMausBotAlias = /-omb-\d+k$/i.test(name);
   return isCloud || isEmbedding || isOpenMausBotAlias;
 }
