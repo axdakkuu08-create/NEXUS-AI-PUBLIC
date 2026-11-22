@@ -1,50 +1,50 @@
 @import "tailwindcss";
 
-/* NEXUS-AI Obsidian Glass: obsidian foundation with balanced cyan and violet accents. */
+/* NEXUS-AI Obsidian Emerald: restrained glow, readable surfaces, mobile-first. */
 :root {
   color-scheme: dark;
-  --bg-base: #05070D;
-  --bg-elevated: #0B101A;
-  --bg-surface: #111A28;
-  --bg-hover: #19263A;
-  --border: #29384F;
-  --border-subtle: #1B2738;
-  --text-primary: #F0F6FF;
-  --text-secondary: #A6B6CC;
-  --text-tertiary: #788BA5;
-  --accent: #00D9FF;
-  --accent-hover: #65E8FF;
-  --accent-muted: rgba(0, 217, 255, 0.13);
-  --accent-glow: rgba(0, 217, 255, 0.42);
-  --accent-blue: #00D9FF;
-  --accent-violet: #9B5CFF;
-  --success: #43D6B0;
+  --bg-base: #050807;
+  --bg-elevated: #0A100E;
+  --bg-surface: #101A16;
+  --bg-hover: #162420;
+  --border: #1C322A;
+  --border-subtle: #14231D;
+  --text-primary: #E8F5EF;
+  --text-secondary: #8FAFA0;
+  --text-tertiary: #5A7A6C;
+  --accent: #00E676;
+  --accent-hover: #69F0AE;
+  --accent-muted: rgba(0, 230, 118, 0.12);
+  --accent-glow: rgba(0, 230, 118, 0.32);
+  --accent-blue: #00BFA5;
+  --accent-violet: #5C9B82;
+  --success: #00C978;
   --warning: #F5BD62;
   --danger: #FF7185;
-  --info: #63C7FF;
+  --info: #69C9B0;
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --bg-base: #F3F6FC;
+  --bg-base: #F3F8F5;
   --bg-elevated: #FFFFFF;
-  --bg-surface: #EAF0F9;
-  --bg-hover: #DCE7F5;
-  --border: #CAD7E8;
-  --border-subtle: #E1E9F3;
-  --text-primary: #142238;
-  --text-secondary: #4E627E;
-  --text-tertiary: #71839B;
-  --accent: #087FB5;
-  --accent-hover: #066A99;
-  --accent-muted: rgba(8, 127, 181, 0.10);
-  --accent-glow: rgba(8, 127, 181, 0.18);
-  --accent-blue: #087FB5;
-  --accent-violet: #7655C8;
-  --success: #138B70;
+  --bg-surface: #EAF3ED;
+  --bg-hover: #DCEBE1;
+  --border: #C6DCCF;
+  --border-subtle: #E1ECE5;
+  --text-primary: #14291E;
+  --text-secondary: #4F6B5A;
+  --text-tertiary: #718B7B;
+  --accent: #087F46;
+  --accent-hover: #066A39;
+  --accent-muted: rgba(8, 127, 70, 0.10);
+  --accent-glow: rgba(8, 127, 70, 0.18);
+  --accent-blue: #087F68;
+  --accent-violet: #527E67;
+  --success: #138B59;
   --warning: #A96A0A;
   --danger: #C83D58;
-  --info: #167AC2;
+  --info: #167A65;
 }
 
 @theme inline {
@@ -80,39 +80,43 @@ body {
   overflow-x: hidden;
 }
 
-/* Static ambient lighting: no animated gradients or paint-heavy effects. */
+/* Static ambient lighting keeps mobile compositing lightweight. */
 .ambient-glow {
   background:
-    radial-gradient(ellipse 72% 42% at 50% -18%, rgba(0, 217, 255, 0.15), transparent 72%),
-    radial-gradient(ellipse 48% 34% at 100% 0%, rgba(155, 92, 255, 0.12), transparent 76%),
-    radial-gradient(ellipse 34% 28% at 0% 72%, rgba(0, 217, 255, 0.045), transparent 78%),
+    radial-gradient(ellipse 72% 42% at 50% -18%, rgba(0, 230, 118, 0.13), transparent 72%),
+    radial-gradient(ellipse 42% 30% at 100% 0%, rgba(0, 191, 165, 0.075), transparent 76%),
+    radial-gradient(ellipse 34% 28% at 0% 72%, rgba(0, 230, 118, 0.035), transparent 78%),
     var(--bg-base);
 }
 
-/* Glossy glass appearance without backdrop-filter for lightweight mobile compositing. */
+/* Optional dotted texture for high-level workspace surfaces. */
+.workspace-grid {
+  background-image: radial-gradient(rgba(0, 230, 118, 0.14) 0.8px, transparent 0.8px);
+  background-size: 28px 28px;
+}
+
+/* Glass surfaces use subtle gradients without backdrop-filter. */
 .glass {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.075), transparent 34%),
-    linear-gradient(145deg, rgba(18, 34, 53, 0.97), rgba(7, 12, 22, 0.98));
-  border: 1px solid rgba(0, 217, 255, 0.22);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.045), transparent 36%),
+    linear-gradient(145deg, rgba(16, 32, 24, 0.97), rgba(7, 13, 10, 0.98));
+  border: 1px solid rgba(0, 230, 118, 0.19);
   box-shadow:
-    inset 0 1px 0 rgba(240, 250, 255, 0.14),
-    inset 0 -1px 0 rgba(155, 92, 255, 0.09),
-    0 0 22px rgba(0, 217, 255, 0.055);
+    inset 0 1px 0 rgba(232, 245, 239, 0.07),
+    0 0 22px rgba(0, 230, 118, 0.045);
 }
 
 [data-theme="light"] .glass {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(235, 242, 251, 0.98));
-  border-color: rgba(8, 127, 181, 0.25);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 4px 18px rgba(8, 127, 181, 0.055);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(235, 245, 238, 0.98));
+  border-color: rgba(8, 127, 70, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 4px 18px rgba(8, 127, 70, 0.045);
 }
 
 .card-glow {
   box-shadow:
-    0 0 0 1px rgba(0, 217, 255, 0.10),
-    0 0 18px rgba(0, 217, 255, 0.075),
-    0 0 28px rgba(155, 92, 255, 0.045),
-    0 8px 24px rgba(0, 0, 0, 0.24);
+    0 0 0 1px rgba(0, 230, 118, 0.055),
+    0 0 18px rgba(0, 230, 118, 0.035),
+    0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
 .accent-ring:focus-within {
