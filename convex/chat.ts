@@ -26,7 +26,7 @@ export const reply = action({
 
     let endpoint: URL;
     try {
-      endpoint = new URL(`${baseUrl.replace(/\\/+$/, "")}/chat/completions`);
+      endpoint = new URL(baseUrl.replace(/\/+$/, "") + "/chat/completions");
     } catch {
       throw new Error("The AI provider URL is invalid.");
     }
@@ -36,7 +36,7 @@ export const reply = action({
 
     const upstream = await fetch(endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
         messages: messages.map(({ role, content }) => ({ role, content })),
