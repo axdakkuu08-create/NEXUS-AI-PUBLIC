@@ -1,13 +1,14 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action } from "./_generated/server";
-import { requireUserId } from "./lib/auth";
 
 export const reply = action({
   args: { conversationId: v.id("conversations") },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const ownerId = await requireUserId(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated: sign in before using NEXUS-AI chat.");
+    const ownerId = identity.tokenIdentifier;
     const messages = await ctx.runQuery(internal.messages.getRecentForChat, {
       conversationId: args.conversationId,
       ownerId,
