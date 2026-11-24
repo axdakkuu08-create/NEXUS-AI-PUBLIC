@@ -45,7 +45,7 @@ jobs:
         run: |
           test -s package-lock.json
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
             git diff --exit-code -- package-lock.json
           fi
       - name: Install locked dependencies
