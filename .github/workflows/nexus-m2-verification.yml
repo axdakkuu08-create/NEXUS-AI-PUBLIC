@@ -33,7 +33,7 @@ jobs:
         if: github.event_name == 'push' && github.ref_name == 'feat/nexus-m2-convex-chat'
         run: |
           set -euo pipefail
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
           if ! git diff --quiet -- package-lock.json; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -49,7 +49,7 @@ jobs:
             git diff --exit-code -- package-lock.json
           fi
       - name: Install locked dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund --legacy-peer-deps
       - name: Generate Convex types and validate backend schema
         env:
           CONVEX_AGENT_MODE: anonymous
