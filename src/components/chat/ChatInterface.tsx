@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { SignInButton } from "@clerk/nextjs";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { MessageSquarePlus } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -39,13 +39,12 @@ function ConnectedChatInterface() {
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const conversations = useQuery(api.conversations.list, isAuthenticated ? {} : "skip");
   const createConversation = useMutation(api.conversations.create);
-  const addMessage = useMutation(api.messages.add);
+  const addUserMessage = useMutation(api.messages.add);
+  const requestAssistantReply = useAction(api.chat.reply);
   const [selectedConversationId, setSelectedConversationId] = useState<Id<"conversations"> | null>(null);
   const [conversationChoiceMade, setConversationChoiceMade] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const controllerRef = useRef<AbortController | null>(null);
 
   const activeConversationId = conversationChoiceMade
     ? selectedConversationId
@@ -58,11 +57,8 @@ function ConnectedChatInterface() {
 
   const handleSend = async (content: string) => {
     if (pending || !isAuthenticated) return;
-    const controller = new AbortController();
-    controllerRef.current = controller;
     setPending(true);
     setError(null);
-    setNotice(null);
 
     try {
       let conversationId = activeConversationId;
@@ -72,41 +68,14 @@ function ConnectedChatInterface() {
         setConversationChoiceMade(true);
       }
 
-      const history = (storedMessages ?? []).slice(-18).map((message) => ({
-        role: message.role,
-        content: message.content,
-      }));
-      await addMessage({ conversationId, role: "user", content });
-
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        signal: controller.signal,
-        body: JSON.stringify({ messages: [...history, { role: "user", content }] }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(typeof payload.error === "string" ? payload.error : "The AI service could not respond.");
-      }
-      if (typeof payload.message !== "string" || !payload.message.trim()) {
-        throw new Error("The AI provider returned an empty response.");
-      }
-
-      await addMessage({ conversationId, role: "assistant", content: payload.message });
+      await addUserMessage({ conversationId, content });
+      await requestAssistantReply({ conversationId });
     } catch (cause) {
-      if (cause instanceof Error && cause.name === "AbortError") {
-        setNotice("Response stopped. Your message remains saved in this conversation.");
-      } else {
-        setError(cause instanceof Error ? cause.message : "The response could not be completed.");
-      }
+      setError(cause instanceof Error ? cause.message : "The response could not be completed.");
     } finally {
-      controllerRef.current = null;
       setPending(false);
     }
   };
-
-  const handleStop = () => controllerRef.current?.abort();
 
   if (authLoading) {
     return <div className="p-6 text-center text-sm text-[var(--text-secondary)]">Checking your secure session…</div>;
@@ -182,11 +151,10 @@ function ConnectedChatInterface() {
           />
         ) : visibleMessages.map((message) => <MessageBubble key={message.id} message={message} />)}
         {pending && <p className="text-xs text-[var(--text-tertiary)]" role="status">NEXUS is waiting for the model response…</p>}
-        {notice && <p className="text-xs text-[var(--text-secondary)]" role="status">{notice}</p>}
         {error && <p className="rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-3 text-xs text-[var(--danger)]" role="alert">{error}</p>}
       </div>
 
-      <ChatInput onSend={handleSend} onStop={handleStop} streaming={pending} />
+      <ChatInput disabled={pending} onSend={handleSend} />
     </div>
   );
 }
