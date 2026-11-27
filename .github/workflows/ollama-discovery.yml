@@ -3,7 +3,12 @@ name: Ollama discovery contract
 on:
   push:
     branches:
-      - feat/ollama-discovery-contract
+      - feat/pwa-offline-shell
+      - feat/ollama-discovery-remediation
+  pull_request:
+    branches:
+      - feat/pwa-offline-shell
+  workflow_dispatch:
 
 permissions:
   contents: read
