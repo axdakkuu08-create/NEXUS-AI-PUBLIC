@@ -98,6 +98,7 @@ test("cloud, cloud-preview, embedding families, and OpenMausBot aliases are excl
     String(input).endsWith("/api/tags")
       ? jsonResponse(tags([
           ...excluded.map((name) => model(name)),
+          model("llama3.2-omb-8k:latest"),
           model("mistral:latest", 2048),
         ]))
       : jsonResponse({ version: "0.5.7" })
@@ -210,6 +211,34 @@ test("request timeout is exactly two seconds and classified as not-running", asy
     assert.equal(requestedTimeout, 2_000);
     assert.equal(result.state, "not-running");
     if (result.state === "not-running") assert.equal(result.problem, "timeout");
+  } finally {
+    AbortSignal.timeout = originalTimeout;
+  }
+});
+
+test("timeout while reading a response body is classified as timeout", async () => {
+  const originalTimeout = AbortSignal.timeout;
+  const timeoutController = new AbortController();
+  AbortSignal.timeout = (() => timeoutController.signal) as typeof AbortSignal.timeout;
+
+  try {
+    const result = await discoverOllama(async (input) => {
+      if (!String(input).endsWith("/api/tags")) {
+        return jsonResponse({ version: "0.5.7" });
+      }
+      return new Response(new ReadableStream<Uint8Array>({
+        pull(controller) {
+          timeoutController.abort(new DOMException("timed out", "TimeoutError"));
+          controller.error(new DOMException("aborted", "AbortError"));
+        },
+      }), { headers: { "content-type": "application/json" } });
+    });
+
+    assert.deepEqual(result, {
+      state: "not-running",
+      endpoint: "tags",
+      problem: "timeout",
+    });
   } finally {
     AbortSignal.timeout = originalTimeout;
   }
