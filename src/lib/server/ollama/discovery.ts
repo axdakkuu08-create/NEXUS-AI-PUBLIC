@@ -1,3 +1,5 @@
+import "server-only";
+
 /**
  * Server-side, read-only Ollama discovery.
  *
@@ -88,6 +90,15 @@ async function fetchJson(
   fetcher: typeof fetch,
   url: string
 ): Promise<JsonFetchResult> {
+  const timeoutSignal = AbortSignal.timeout(OLLAMA_REQUEST_TIMEOUT_MS);
+  const isTimeout = (error: unknown) => {
+    const name =
+      error && typeof error === "object" && "name" in error
+        ? String(error.name)
+        : "";
+    return timeoutSignal.aborted || name === "TimeoutError";
+  };
+
   let response: Response;
   try {
     response = await fetcher(url, {
@@ -96,19 +107,13 @@ async function fetchJson(
       cache: "no-store",
       credentials: "omit",
       redirect: "error",
-      signal: AbortSignal.timeout(OLLAMA_REQUEST_TIMEOUT_MS),
+      signal: timeoutSignal,
     });
   } catch (error) {
-    const name =
-      error && typeof error === "object" && "name" in error
-        ? String(error.name)
-        : "";
     return {
       ok: false,
       kind: "not-running",
-      problem: name === "TimeoutError" || name === "AbortError"
-        ? "timeout"
-        : "request-failed",
+      problem: isTimeout(error) ? "timeout" : "request-failed",
     };
   }
 
@@ -149,8 +154,12 @@ async function fetchJson(
       }
       body += decoder.decode();
     }
-  } catch {
-    return { ok: false, kind: "not-running", problem: "request-failed" };
+  } catch (error) {
+    return {
+      ok: false,
+      kind: "not-running",
+      problem: isTimeout(error) ? "timeout" : "request-failed",
+    };
   }
 
   try {
@@ -178,7 +187,7 @@ function isExcludedModelName(name: string): boolean {
     /(?:^|:)cloud(?:$|-)/i.test(name) ||
     /-cloud$/i.test(baseName);
   const isEmbedding = /embed|bge-|minilm|bert/i.test(name);
-  const isOpenMausBotAlias = /-omb-\d+k$/i.test(name);
+  const isOpenMausBotAlias = /-omb-\d+k$/i.test(baseName);
   return isCloud || isEmbedding || isOpenMausBotAlias;
 }
 
